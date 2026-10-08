@@ -1,0 +1,186 @@
+{
+  "name": "HR Policies - Load into Pinecone",
+  "nodes": [
+    {
+      "name": "Load HR Policies",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "name": "HR Policy Documents",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const policies = [\n  [\"HR-001\", \"Annual leave (India)\", \"leave\", \"IN\", \"employees\", \"active\", \"2026\",\n   \"Employees in India get 18 days of paid annual leave per calendar year. Leave builds up at 1.5 days per month. Up to 5 unused days can be carried over to the next year and must be used by 31 March. Apply in the HR portal at least 5 working days before the first day of leave. Your manager approves the request.\"],\n  [\"HR-901\", \"Annual leave (India), old 2024 version\", \"leave\", \"IN\", \"employees\", \"archived\", \"2024\",\n   \"Employees in India get 15 days of paid annual leave per calendar year. Up to 10 unused days can be carried over to the next year. Apply by email to your manager.\"],\n  [\"HR-002\", \"Annual leave (UK)\", \"leave\", \"UK\", \"employees\", \"active\", \"2026\",\n   \"Employees in the UK get 25 days of paid annual leave per calendar year, plus 8 bank holidays. The leave year runs from January to December. Up to 5 unused days can be carried over with manager approval and must be used by 31 March. Apply in the HR portal at least 5 working days before the first day of leave.\"],\n  [\"HR-003\", \"Notice period (India)\", \"leaving\", \"IN\", \"employees\", \"active\", \"2026\",\n   \"In India the notice period is 60 days after probation. During probation, which is the first 6 months, the notice period is 15 days. Notice must be given in writing to your manager and HR.\"],\n  [\"HR-004\", \"Notice period (UK)\", \"leaving\", \"UK\", \"employees\", \"active\", \"2026\",\n   \"In the UK the notice period is 1 month after probation. During probation, which is the first 3 months, the notice period is 1 week. Notice must be given in writing to your manager and HR.\"],\n  [\"HR-005\", \"Payroll and pay day (India)\", \"payroll\", \"IN\", \"employees\", \"active\", \"2026\",\n   \"Salaries in India are paid in rupees on the last working day of each month. Payslips are in the HR portal. Tax declarations must be submitted by 15 January. Raise payroll questions with the payroll team within 5 working days of pay day.\"],\n  [\"HR-006\", \"Payroll and pay day (UK)\", \"payroll\", \"UK\", \"employees\", \"active\", \"2026\",\n   \"Salaries in the UK are paid in pounds on the 25th of each month. If the 25th is a weekend or bank holiday, pay arrives on the working day before. Payslips are in the HR portal. P60 forms are issued by the end of May.\"],\n  [\"HR-007\", \"Sick leave (India)\", \"leave\", \"IN\", \"employees\", \"active\", \"2026\",\n   \"Employees in India get 12 days of paid sick leave per calendar year. Tell your manager before your start time on the first day. A doctor's note is needed for more than 2 days in a row. Unused sick leave does not carry over.\"],\n  [\"HR-008\", \"Sick leave (UK)\", \"leave\", \"UK\", \"employees\", \"active\", \"2026\",\n   \"Employees in the UK can self-certify sickness for up to 7 calendar days. After that a fit note from a doctor is needed. Company sick pay covers 10 days at full pay per calendar year. After that, statutory sick pay applies. Tell your manager before your start time on the first day.\"],\n  [\"HR-009\", \"Travel and expenses\", \"expenses\", \"ALL\", \"all\", \"active\", \"2026\",\n   \"Submit expense claims in the expense tool within 30 days, with a receipt for each item. Flights under 6 hours are booked in economy class. Meals are covered up to the daily limit shown in the expense tool. Approved claims for employees are paid with the next payroll. Approved claims for contractors are paid with the next invoice.\"],\n  [\"HR-010\", \"Hybrid and remote work\", \"ways_of_working\", \"ALL\", \"employees\", \"active\", \"2026\",\n   \"Employees work in a hybrid pattern with at least 2 office days per week. Team office days are agreed with your manager. Working from another country for more than 10 working days needs HR approval before you travel.\"],\n  [\"HR-011\", \"Manager guide: performance improvement plan\", \"performance\", \"ALL\", \"managers\", \"active\", \"2026\",\n   \"For managers only. Before starting a performance improvement plan, speak to your HR business partner. Write clear goals with dates. The plan runs for 60 days. Hold a review every 2 weeks and record it in the HR portal. At the end, HR and the manager decide the outcome together.\"],\n  [\"HR-012\", \"Manager guide: annual salary review\", \"pay_review\", \"ALL\", \"managers\", \"active\", \"2026\",\n   \"For managers only. The salary review happens every April. Managers propose increases inside the pay band for each role. Pay band data is confidential and must not be shared with team members. Proposals are approved by the department head and HR.\"],\n  [\"HR-013\", \"Contractors: invoices, leave and sick pay\", \"contractors\", \"ALL\", \"all\", \"active\", \"2026\",\n   \"Contractors send an invoice once a month. Invoices are paid within 30 days. Contractors do not get paid annual leave days or paid sick leave days, and are not eligible for company sick pay. Time off is agreed with the engagement manager.\"]\n];\n\nreturn policies.map(p => ({\n  json: {\n    policy_id: p[0], title: p[1], topic: p[2], country: p[3], audience: p[4], status: p[5], version: p[6],\n    text: p[0] + \" \" + p[1] + \"\\nCountry: \" + p[3] + \". Audience: \" + p[4] + \". Version: \" + p[6] + \" (\" + p[5] + \").\\n\" + p[7]\n  }\n}));\n"
+      }
+    },
+    {
+      "name": "Insert Policies into Pinecone",
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePinecone",
+      "typeVersion": 1.3,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "mode": "insert",
+        "pineconeIndex": {
+          "__rl": true,
+          "mode": "id",
+          "value": "ticket-sops"
+        },
+        "options": {
+          "clearNamespace": true,
+          "pineconeNamespace": "hr-policies"
+        }
+      },
+      "credentials": {
+        "pineconeApi": {
+          "id": "nnPSHuNczuQa0QTg",
+          "name": "Pinecone account"
+        }
+      }
+    },
+    {
+      "name": "OpenAI Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        440,
+        520
+      ],
+      "parameters": {
+        "model": "text-embedding-3-small",
+        "options": {
+          "dimensions": 512
+        }
+      }
+    },
+    {
+      "name": "Policy Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        620,
+        520
+      ],
+      "parameters": {
+        "dataType": "json",
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.text }}",
+        "textSplittingMode": "simple",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "policy_id",
+                "value": "={{ $json.policy_id }}"
+              },
+              {
+                "name": "title",
+                "value": "={{ $json.title }}"
+              },
+              {
+                "name": "topic",
+                "value": "={{ $json.topic }}"
+              },
+              {
+                "name": "country",
+                "value": "={{ $json.country }}"
+              },
+              {
+                "name": "audience",
+                "value": "={{ $json.audience }}"
+              },
+              {
+                "name": "status",
+                "value": "={{ $json.status }}"
+              },
+              {
+                "name": "version",
+                "value": "={{ $json.version }}"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Load HR Policies": {
+      "main": [
+        [
+          {
+            "node": "HR Policy Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Embeddings": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Insert Policies into Pinecone",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Policy Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Insert Policies into Pinecone",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HR Policy Documents": {
+      "main": [
+        [
+          {
+            "node": "Insert Policies into Pinecone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "nodeGroups": [
+    {
+      "name": "Load with metadata",
+      "nodeNames": [
+        "HR Policy Documents",
+        "Insert Policies into Pinecone",
+        "OpenAI Embeddings",
+        "Policy Loader"
+      ],
+      "description": "Embeds 14 HR policies into namespace hr-policies. Each one carries country, audience, status and version."
+    }
+  ],
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  }
+}

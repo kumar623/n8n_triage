@@ -74,9 +74,30 @@ comment on table public.helpdesk_chat_memory is
 
 create index if not exists helpdesk_chat_memory_session_idx on public.helpdesk_chat_memory (session_id);
 
+create table if not exists public.hr_employees (
+  email text primary key,
+  country text not null check (country in ('IN', 'UK')),
+  role text not null check (role in ('contractor', 'employee', 'manager')),
+  annual_leave_total integer not null default 0,
+  annual_leave_used integer not null default 0,
+  sick_leave_used integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+comment on table public.hr_employees is
+  'Demo HR record. Country and role decide which HR policies a person can retrieve (metadata filter). Leave numbers feed the leave balance tool.';
+
+-- Made-up people for the demo and the tests.
+insert into public.hr_employees (email, country, role, annual_leave_total, annual_leave_used, sick_leave_used) values
+  ('priya.nair@example.com', 'IN', 'employee', 18, 6, 1),
+  ('james.carter@example.com', 'UK', 'manager', 25, 10, 0),
+  ('alex.reed@example.com', 'UK', 'contractor', 0, 0, 0)
+on conflict (email) do nothing;
+
 -- n8n connects as the postgres role, which bypasses row level security.
 -- RLS is on with no policies, so the public API roles cannot read these tables.
 alter table public.ticket_log enable row level security;
 alter table public.eval_runs enable row level security;
 alter table public.helpdesk_sessions enable row level security;
 alter table public.helpdesk_chat_memory enable row level security;
+alter table public.hr_employees enable row level security;

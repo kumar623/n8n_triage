@@ -1,0 +1,167 @@
+{
+  "name": "HR Policy Search - Eval (filter on vs off)",
+  "nodes": [
+    {
+      "name": "Run HR Policy Eval",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "name": "Load HR Cases",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const cases = [\n  [\"H01\", \"How many days of annual leave do I get?\", \"IN\", \"employee\", \"HR-001\"],\n  [\"H02\", \"How many days of annual leave do I get?\", \"UK\", \"employee\", \"HR-002\"],\n  [\"H03\", \"On which day is my salary paid?\", \"IN\", \"employee\", \"HR-005\"],\n  [\"H04\", \"On which day is my salary paid?\", \"UK\", \"manager\", \"HR-006\"],\n  [\"H05\", \"What is my notice period if I resign?\", \"IN\", \"employee\", \"HR-003\"],\n  [\"H06\", \"What is my notice period if I resign?\", \"UK\", \"employee\", \"HR-004\"],\n  [\"H07\", \"How many unused leave days can I carry over to next year?\", \"IN\", \"employee\", \"HR-001\"],\n  [\"H08\", \"How do I start a performance improvement plan for someone in my team?\", \"UK\", \"manager\", \"HR-011\"],\n  [\"H09\", \"How do I start a performance improvement plan for someone in my team?\", \"IN\", \"employee\", \"NONE\"],\n  [\"H10\", \"What are the pay bands for my team and can I share them?\", \"IN\", \"employee\", \"NONE\"],\n  [\"H11\", \"How many days of paid sick leave do I get?\", \"UK\", \"contractor\", \"HR-013\"],\n  [\"H12\", \"How do I claim travel expenses?\", \"UK\", \"contractor\", \"HR-009\"],\n  [\"H13\", \"What is the dress code in the office?\", \"IN\", \"employee\", \"NONE\"],\n  [\"H14\", \"How many days of paid sick leave do I get?\", \"IN\", \"employee\", \"HR-007\"]\n];\n\nconst items = [];\nfor (const mode of [\"strict\", \"off\"]) {\n  for (const c of cases) {\n    items.push({ json: { case_id: c[0], question: c[1], country: c[2], role: c[3], expected: c[4], filter_mode: mode } });\n  }\n}\nreturn items;\n"
+      }
+    },
+    {
+      "name": "Search HR Policy",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "mode": "each",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "ei0B5ZNmQz3VHJo2"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "question",
+              "displayName": "question",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "country",
+              "displayName": "country",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "role",
+              "displayName": "role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "filter_mode",
+              "displayName": "filter_mode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "question": "={{ $json.question }}",
+            "country": "={{ $json.country }}",
+            "role": "={{ $json.role }}",
+            "filter_mode": "={{ $json.filter_mode }}"
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "name": "Score HR Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const expected = $(\"Load HR Cases\").all().map(i => i.json);\nconst actual = $input.all().map(i => i.json);\n\nconst summary = { strict: { total: 0, correct: 0 }, off: { total: 0, correct: 0 } };\nconst rows = [];\n\nfor (let i = 0; i < expected.length; i++) {\n  const e = expected[i];\n  const a = actual[i] || {};\n  const got = a.found ? String(a.policy_source || \"\").slice(0, 6) : \"NONE\";\n  const ok = got === e.expected;\n  summary[e.filter_mode].total++;\n  if (ok) summary[e.filter_mode].correct++;\n  rows.push({\n    case_id: e.case_id, filter: e.filter_mode, who: e.country + \" \" + e.role, question: e.question,\n    expected: e.expected, got, ok, score: a.score,\n    candidates: (a.candidates || []).map(c => c.policy_id + \":\" + c.score).join(\", \"),\n    answer: a.answer\n  });\n}\n\nreturn [{\n  json: {\n    with_filter: summary.strict.correct + \" of \" + summary.strict.total,\n    without_filter: summary.off.correct + \" of \" + summary.off.total,\n    failures: rows.filter(r => !r.ok),\n    rows\n  }\n}];\n"
+      }
+    }
+  ],
+  "connections": {
+    "Run HR Policy Eval": {
+      "main": [
+        [
+          {
+            "node": "Load HR Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load HR Cases": {
+      "main": [
+        [
+          {
+            "node": "Search HR Policy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search HR Policy": {
+      "main": [
+        [
+          {
+            "node": "Score HR Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "nodeGroups": [
+    {
+      "name": "Filter on versus off",
+      "nodeNames": [
+        "Load HR Cases",
+        "Search HR Policy",
+        "Score HR Results"
+      ],
+      "description": "Runs 14 HR questions twice: with the metadata filter and with it switched off. Reports both scores."
+    }
+  ],
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  }
+}
