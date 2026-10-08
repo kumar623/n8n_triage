@@ -21,7 +21,7 @@
       "credentials": {
         "httpHeaderAuth": {
           "id": "5oGXCorFzJlmqrX0",
-          "name": "Header Auth account"
+          "name": "Triage Webhook Secret"
         }
       }
     },
@@ -914,6 +914,38 @@
           "name": "Gmail account"
         }
       }
+    },
+    {
+      "id": "07162d38-b174-4c90-9e85-d3c1e24f6e77",
+      "name": "Call On-Call via Vapi",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        2464,
+        640
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.vapi.ai/call",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify(['This is an automated priority one alert from IT ticket triage. ' + $('Build Ticket Record').first().json.subject + '. ' + $('Build Ticket Record').first().json.summary + ' An approval request is waiting in Slack. Say acknowledged to end this call.'].map(alert => ({ assistantId: 'YOUR-VAPI-ASSISTANT-ID', phoneNumberId: 'YOUR-VAPI-PHONE-NUMBER-ID', customer: { number: '+10000000000' }, assistantOverrides: { firstMessage: alert, variableValues: { alert_text: alert } } }))[0]) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false,
+      "notes": "P1 phone call. Vapi dials the on-call number and the assistant reads the alert. No retry on purpose: a retry could place a second call. If this fails, the ticket still continues.",
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "7FdFQOWUPxwvJmKy",
+          "name": "Vapi API key"
+        }
+      }
     }
   ],
   "connections": {
@@ -1161,7 +1193,7 @@
       "main": [
         [
           {
-            "node": "Needs Human?",
+            "node": "Call On-Call via Vapi",
             "type": "main",
             "index": 0
           }
@@ -1191,6 +1223,17 @@
         [
           {
             "node": "Was Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call On-Call via Vapi": {
+      "main": [
+        [
+          {
+            "node": "Needs Human?",
             "type": "main",
             "index": 0
           }
@@ -1240,6 +1283,7 @@
         "Suggest Fix",
         "Is P1?",
         "Email P1 Alert",
+        "Call On-Call via Vapi",
         "Needs Human?",
         "Ask Approval in Slack",
         "Got a Decision?",
@@ -1247,7 +1291,7 @@
         "Was Approved?",
         "Build Outcome"
       ],
-      "description": "RAG suggests a fix. P1 tickets send an email alert. Sensitive tickets wait for Approve or Decline in Slack, with an escalation if nobody clicks."
+      "description": "RAG suggests a fix. P1 sends an email and a phone call. Sensitive tickets wait for Approve or Decline, with escalation."
     },
     {
       "name": "Action and log",

@@ -68,7 +68,7 @@
       "credentials": {
         "httpHeaderAuth": {
           "id": "5oGXCorFzJlmqrX0",
-          "name": "Header Auth account"
+          "name": "Triage Webhook Secret"
         }
       }
     },

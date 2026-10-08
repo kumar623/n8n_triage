@@ -12,7 +12,7 @@ Status: working prototype, built as a personal project. It runs live on an n8n c
 4. Claude Haiku classifies it: category, priority, affected system, summary, confidence.
 5. Code re-checks the model output. P1, security, low confidence, or bad output forces a human review.
 6. RAG: the ticket is matched against SOPs in Pinecone, and Claude writes a short fix using only the matching SOP.
-7. P1 tickets send an email alert through Gmail.
+7. P1 tickets send an email alert through Gmail, and Vapi places a phone call to the on-call number and reads out the alert.
 8. Tickets that need a human wait in Slack for Approve or Decline. If nobody clicks within 1 hour, a second, escalated request is posted with a channel mention. If that also gets no click within 1 hour, the ticket is logged as timed out.
 9. Auto-triaged and approved tickets create a Jira issue with the priority, triage details and suggested fix. Declined and timed-out tickets create nothing.
 10. The outcome, with the Jira link, is posted to Slack and saved in Postgres.
@@ -35,7 +35,8 @@ flowchart LR
     H1 --> R[Suggest Fix: sub-workflow, Pinecone + Claude]
     R --> P{P1?}
     P -- yes --> P1[Gmail: P1 alert]
-    P1 --> I{Needs human?}
+    P1 --> P2[Vapi: phone call to on-call]
+    P2 --> I{Needs human?}
     P -- no --> I
     I -- yes --> J[Slack: Approve or Decline, 1 hour]
     J -- clicked --> K[Build Outcome]
@@ -114,6 +115,7 @@ The files hold credential names and ids only. No keys or passwords are stored in
 | Run crashes after claiming a ticket | A row stuck in `processing` for 15 minutes can be claimed again |
 | Model or database call fails | Retries: 2 or 3 tries with a wait between them |
 | Slack is down | Outcome message is set to continue on error, so the ticket still completes |
+| Vapi call fails | No retry, on purpose, so the phone cannot ring twice. The ticket continues with email and Slack |
 | Jira is down | 3 tries, then continue. Slack says the issue was not created and `jira_key` stays empty |
 | Nobody answers the approval | After 1 hour a second, escalated request is posted. After 1 more hour the outcome is saved as `timed_out` with `escalated = true`, and no Jira issue is created |
 | Unknown callers | The webhook requires a secret header (n8n Header Auth credential). Calls without it get 403 before the workflow runs |
@@ -157,6 +159,7 @@ Run the evals after every prompt, SOP, threshold or model change.
 | Slack | Alerts and approvals | Slack OAuth2 |
 | Jira Software Cloud | Issue creation in project IT Support | Email plus API token |
 | Gmail | P1 alert email | Gmail OAuth2 |
+| Vapi (with a Twilio number) | P1 phone call. The assistant reads the alert passed in `assistantOverrides` | Bearer Auth (Vapi private key) |
 | Webhook callers | Secret header on the intake webhook | Header Auth |
 
 ## Set up in a new n8n
@@ -166,7 +169,7 @@ Run the evals after every prompt, SOP, threshold or model change.
 3. In n8n, add credentials for Postgres, Slack, Jira, Gmail, Pinecone, Anthropic and OpenAI, plus a Header Auth credential for the webhook secret.
 4. Import the files in `workflows/` in this order: 02, 03, 04, then 01, then the rest.
 5. In 01, 07 and 08, re-point the "Execute Sub-workflow" nodes to the imported 02 and 03 (workflow ids change on import). In 01, set the error workflow to 04.
-6. Pick your Slack channel in the Slack nodes, your Jira project and issue type in the Jira node, and the alert address in the Gmail node. Set your own n8n host in the HTTP nodes of 05 and 09.
+6. Pick your Slack channel in the Slack nodes, your Jira project and issue type in the Jira node, the alert address in the Gmail node, and your Vapi assistant id, phone number id and on-call number in the Vapi node. Set your own n8n host in the HTTP nodes of 05 and 09.
 7. Run 06 once to load the SOPs. Run 07 and 08 and check the scores.
 8. Publish 02, 03, 04, then 01.
 
@@ -205,7 +208,8 @@ Where to look first: n8n **Executions** list, open the failed run, click the red
 ## Known limits
 
 - The webhook requires a secret header, but the demo form page itself is public. Unpublish the form when it is not in use.
-- The P1 alert goes to one fixed email address. A real setup would use an on-call tool or a distribution list.
+- The P1 email and phone call go to one fixed address and one fixed number. A real setup would use an on-call rota.
+- The workflow knows Vapi accepted the call, not whether anyone picked up. Vapi's end-of-call webhook would be needed for that.
 - "Ignore SSL Issues" is on for the Postgres credential. For real use, add the Supabase CA certificate.
 - Jira issues are created but not updated later. There is no sync back from Jira when an issue is resolved.
 - A crash between creating the Jira issue and saving the outcome could create a second issue when the ticket is retried after 15 minutes.
