@@ -12,7 +12,10 @@
       "name": "Receive Ticket",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.2,
-      "position": [0, 304],
+      "position": [
+        0,
+        304
+      ],
       "webhookId": "36440bc3-ea4b-4ee2-9261-39244f2b3a4c"
     },
     {
@@ -57,7 +60,10 @@
       "name": "Normalize Ticket",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.5,
-      "position": [224, 304]
+      "position": [
+        224,
+        304
+      ]
     },
     {
       "parameters": {
@@ -88,7 +94,10 @@
       "name": "Has Ticket Content?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [448, 304]
+      "position": [
+        448,
+        304
+      ]
     },
     {
       "parameters": {
@@ -102,7 +111,10 @@
       "name": "Reject Empty Ticket",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
-      "position": [672, 512]
+      "position": [
+        672,
+        512
+      ]
     },
     {
       "parameters": {
@@ -124,7 +136,10 @@
       "name": "Notify Slack",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.7,
-      "position": [2912, 304],
+      "position": [
+        3136,
+        304
+      ],
       "webhookId": "5c2779ca-52d2-44c6-bf88-f4e653c23018",
       "retryOnFail": true,
       "maxTries": 3,
@@ -149,7 +164,10 @@
       "name": "Return Classification",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
-      "position": [1792, 528]
+      "position": [
+        1792,
+        304
+      ]
     },
     {
       "parameters": {
@@ -164,7 +182,10 @@
       "name": "Claim Ticket",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
-      "position": [672, 304],
+      "position": [
+        672,
+        304
+      ],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 2000,
@@ -206,7 +227,10 @@
       "name": "Is New Ticket?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [896, 304]
+      "position": [
+        896,
+        304
+      ]
     },
     {
       "parameters": {
@@ -220,7 +244,10 @@
       "name": "Return Duplicate",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
-      "position": [1120, 528]
+      "position": [
+        1120,
+        528
+      ]
     },
     {
       "parameters": {
@@ -276,7 +303,10 @@
       "name": "Classify Ticket",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.4,
-      "position": [1120, 304],
+      "position": [
+        1120,
+        304
+      ],
       "notes": "Calls the shared sub-workflow 'Ticket Classifier (shared)'. The eval workflow calls the same one."
     },
     {
@@ -310,7 +340,10 @@
       "name": "Build Ticket Record",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.5,
-      "position": [1344, 304]
+      "position": [
+        1344,
+        304
+      ]
     },
     {
       "parameters": {
@@ -325,7 +358,10 @@
       "name": "Save Classification",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
-      "position": [1568, 304],
+      "position": [
+        1568,
+        304
+      ],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 2000,
@@ -365,7 +401,10 @@
       "name": "Needs Human?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [2016, 304]
+      "position": [
+        2240,
+        304
+      ]
     },
     {
       "parameters": {
@@ -395,7 +434,10 @@
       "name": "Ask Approval in Slack",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.7,
-      "position": [2240, 144],
+      "position": [
+        2464,
+        144
+      ],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 3000,
@@ -437,7 +479,10 @@
       "name": "Was Approved?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
-      "position": [2464, 144]
+      "position": [
+        2688,
+        144
+      ]
     },
     {
       "parameters": {
@@ -517,7 +562,10 @@
       "name": "Build Outcome",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.5,
-      "position": [2688, 304]
+      "position": [
+        2912,
+        304
+      ]
     },
     {
       "parameters": {
@@ -532,7 +580,10 @@
       "name": "Save Outcome",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
-      "position": [3136, 304],
+      "position": [
+        3360,
+        304
+      ],
       "retryOnFail": true,
       "maxTries": 3,
       "waitBetweenTries": 2000,
@@ -548,7 +599,10 @@
       "name": "Suggest Fix",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.4,
-      "position": [1792, 304],
+      "position": [
+        2016,
+        304
+      ],
       "parameters": {
         "mode": "once",
         "options": {
@@ -607,63 +661,197 @@
   ],
   "connections": {
     "Receive Ticket": {
-      "main": [[{ "node": "Normalize Ticket", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Normalize Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Normalize Ticket": {
-      "main": [[{ "node": "Has Ticket Content?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Has Ticket Content?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Has Ticket Content?": {
       "main": [
-        [{ "node": "Claim Ticket", "type": "main", "index": 0 }],
-        [{ "node": "Reject Empty Ticket", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Claim Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject Empty Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Claim Ticket": {
-      "main": [[{ "node": "Is New Ticket?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Is New Ticket?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Is New Ticket?": {
       "main": [
-        [{ "node": "Classify Ticket", "type": "main", "index": 0 }],
-        [{ "node": "Return Duplicate", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Classify Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Duplicate",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Classify Ticket": {
-      "main": [[{ "node": "Build Ticket Record", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Ticket Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Ticket Record": {
-      "main": [[{ "node": "Save Classification", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Save Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Save Classification": {
       "main": [
         [
-          { "node": "Return Classification", "type": "main", "index": 0 },
-          { "node": "Suggest Fix", "type": "main", "index": 0 }
+          {
+            "node": "Return Classification",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Needs Human?": {
       "main": [
-        [{ "node": "Ask Approval in Slack", "type": "main", "index": 0 }],
-        [{ "node": "Build Outcome", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Ask Approval in Slack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Ask Approval in Slack": {
-      "main": [[{ "node": "Was Approved?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Was Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Was Approved?": {
       "main": [
-        [{ "node": "Build Outcome", "type": "main", "index": 0 }],
-        [{ "node": "Build Outcome", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Build Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Build Outcome": {
-      "main": [[{ "node": "Notify Slack", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Notify Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Notify Slack": {
-      "main": [[{ "node": "Save Outcome", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Save Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Suggest Fix": {
-      "main": [[{ "node": "Needs Human?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Needs Human?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Classification": {
+      "main": [
+        [
+          {
+            "node": "Suggest Fix",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -676,25 +864,44 @@
     {
       "id": "eccb8daa-32fa-4ed2-ba47-0816d59404a9",
       "name": "Intake",
-      "nodeNames": ["Normalize Ticket", "Has Ticket Content?"],
+      "nodeNames": [
+        "Normalize Ticket",
+        "Has Ticket Content?"
+      ],
       "description": "Cleans the incoming ticket, builds a dedupe key, and stops empty tickets before any AI cost."
     },
     {
       "id": "53cb1732-ebc8-4620-885e-a20f935b903e",
       "name": "Duplicate check",
-      "nodeNames": ["Claim Ticket", "Is New Ticket?"],
+      "nodeNames": [
+        "Claim Ticket",
+        "Is New Ticket?"
+      ],
       "description": "Claims the ticket in Postgres. If the same ticket arrives twice, the second one stops here."
     },
     {
       "id": "dcceef93-0b5a-4694-9ded-e15ca609b9e3",
       "name": "Classification",
-      "nodeNames": ["Classify Ticket", "Build Ticket Record", "Save Classification"],
-      "description": "Calls the shared Claude classifier, builds one ticket record, and saves it."
+      "nodeNames": [
+        "Classify Ticket",
+        "Build Ticket Record",
+        "Save Classification",
+        "Return Classification"
+      ],
+      "description": "Calls the shared Claude classifier, saves the result, and replies to the sender right away."
     },
     {
       "id": "c4a0750c-c9a4-41da-be89-57eaca81aeb2",
       "name": "Suggested fix, approval and outcome",
-      "nodeNames": ["Suggest Fix", "Needs Human?", "Ask Approval in Slack", "Was Approved?", "Build Outcome", "Notify Slack", "Save Outcome"],
+      "nodeNames": [
+        "Suggest Fix",
+        "Needs Human?",
+        "Ask Approval in Slack",
+        "Was Approved?",
+        "Build Outcome",
+        "Notify Slack",
+        "Save Outcome"
+      ],
       "description": "RAG suggests a fix from the SOPs. Sensitive tickets wait for Approve or Decline in Slack. The outcome is posted and saved."
     }
   ],

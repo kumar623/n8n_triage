@@ -29,8 +29,8 @@ flowchart LR
     E -- yes --> F[Classify Ticket: sub-workflow, Claude Haiku]
     F --> G[Build Ticket Record]
     G --> H[(Save Classification)]
-    H --> H1[200 Return Classification]
-    H --> R[Suggest Fix: sub-workflow, Pinecone + Claude]
+    H --> H1[200 Return Classification to sender]
+    H1 --> R[Suggest Fix: sub-workflow, Pinecone + Claude]
     R --> I{Needs human?}
     I -- yes --> J[Slack: Approve or Decline]
     J --> K[Build Outcome]
@@ -106,6 +106,7 @@ The files hold credential names and ids only. No keys or passwords are stored in
 | Nobody answers the approval | Wait ends after 1 hour, outcome is saved as `timed_out` |
 | Model returns a bad value | Code validation replaces it with a safe default and forces human review |
 | Ticket text tries to instruct the model | Prompts treat ticket text as data. Covered by an eval case |
+| Sender waits on a human | The reply to the sender is sent right after classification, before the RAG step and the Slack approval. An earlier version replied after the approval, so the sender timed out at 60 seconds and resent (caught by the duplicate check) |
 | Workflow error | Error workflow posts an alert to Slack (production runs only) |
 
 ## Evaluation
