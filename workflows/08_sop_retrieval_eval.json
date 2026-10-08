@@ -1,0 +1,162 @@
+{
+  "name": "SOP Retrieval - Eval (8 tickets)",
+  "nodes": [
+    {
+      "id": "cfbf9071-ab26-49ed-99a4-1e641851c7e1",
+      "name": "Run RAG Eval",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "7bea9eb0-c25f-4704-9b08-5599413dab90",
+      "name": "Load RAG Cases",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const cases = [\n  [\"R01\", \"Cannot log in to Salesforce after password reset\", \"User cannot log in to Salesforce after a password reset and has a client call in one hour.\", \"Salesforce\", \"SOP-001\"],\n  [\"R02\", \"Entire sales team locked out of CRM\", \"Thirty sales team members are unable to log into the CRM system since 9am.\", \"CRM\", \"SOP-003\"],\n  [\"R03\", \"Slow Wi-Fi in meeting room 3\", \"Video calls freeze in meeting room 3 while the wired connection works fine.\", \"Wi-Fi\", \"SOP-005\"],\n  [\"R04\", \"Clicked a suspicious link\", \"User clicked a link in a strange email and typed their password before noticing it may be phishing.\", \"email\", \"SOP-006\"],\n  [\"R05\", \"Lost work phone\", \"User left their work phone on a train. It has company email on it.\", \"mobile phone\", \"SOP-009\"],\n  [\"R06\", \"Printer on 2nd floor keeps jamming\", \"The 2nd floor printer jams on every other page.\", \"printer\", \"SOP-010\"],\n  [\"R07\", \"its broken\", \"User reports something is broken but gives no details.\", \"unknown\", \"NONE\"],\n  [\"R08\", \"Need a Photoshop licence\", \"User asks for an Adobe Photoshop licence for a design project.\", \"Adobe Photoshop\", \"NONE\"]\n];\n\nreturn cases.map(c => ({ json: { case_id: c[0], subject: c[1], summary: c[2], affected_system: c[3], expected_sop: c[4] } }));"
+      }
+    },
+    {
+      "id": "762df6da-5fc9-438e-8dab-b3b2e92ec25a",
+      "name": "Suggest Fix",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "mode": "each",
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "4p3guL580nQpFslk"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "subject": "={{ $json.subject }}",
+            "summary": "={{ $json.summary }}",
+            "affected_system": "={{ $json.affected_system }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "subject",
+              "displayName": "subject",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "summary",
+              "displayName": "summary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "affected_system",
+              "displayName": "affected_system",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    },
+    {
+      "id": "8eb7a14d-e150-459e-9866-b2fe3f0bfd65",
+      "name": "Score RAG Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const expected = $(\"Load RAG Cases\").all().map(i => i.json);\nconst actual = $input.all().map(i => i.json);\n\nlet correct = 0;\nconst rows = [];\n\nfor (let i = 0; i < expected.length; i++) {\n  const e = expected[i];\n  const a = actual[i] || {};\n  const got = a.sop_found ? String(a.sop_source || \"\").slice(0, 7) : \"NONE\";\n  const ok = got === e.expected_sop;\n  if (ok) correct++;\n  rows.push({ case_id: e.case_id, subject: e.subject, expected: e.expected_sop, got, score: a.sop_score, ok, suggested_fix: a.suggested_fix });\n}\n\nreturn [{ json: { total: expected.length, correct, accuracy_pct: Math.round((correct / expected.length) * 1000) / 10, rows } }];"
+      }
+    }
+  ],
+  "connections": {
+    "Run RAG Eval": {
+      "main": [
+        [
+          {
+            "node": "Load RAG Cases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load RAG Cases": {
+      "main": [
+        [
+          {
+            "node": "Suggest Fix",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suggest Fix": {
+      "main": [
+        [
+          {
+            "node": "Score RAG Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "nodeGroups": [
+    {
+      "id": "a31bdf46-cb88-4d07-9c32-769d7f711144",
+      "name": "RAG eval",
+      "nodeNames": [
+        "Load RAG Cases",
+        "Suggest Fix",
+        "Score RAG Results"
+      ],
+      "description": "Sends 8 tickets through the RAG sub-workflow and checks the right SOP (or no SOP) comes back."
+    }
+  ],
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  }
+}

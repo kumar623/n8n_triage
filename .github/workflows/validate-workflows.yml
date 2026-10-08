@@ -1,0 +1,46 @@
+name: Validate n8n workflow JSON
+
+on:
+  push:
+    paths:
+      - "workflows/**"
+  pull_request:
+    paths:
+      - "workflows/**"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check every workflow file
+        run: |
+          set -euo pipefail
+          failed=0
+          for f in workflows/*.json; do
+            # 1) valid JSON  2) has a name  3) has nodes  4) every connection points to a node that exists
+            if ! jq -e '
+              (.name | type == "string" and length > 0)
+              and (.nodes | type == "array" and length > 0)
+              and (.connections | type == "object")
+              and ([.nodes[].name] as $names
+                   | [.connections | to_entries[] | .key, (.value[][][]?.node)]
+                   | all(. as $n | $names | index($n) != null))
+            ' "$f" > /dev/null; then
+              echo "FAILED: $f"
+              failed=1
+            else
+              echo "ok: $f"
+            fi
+          done
+          exit $failed
+
+      - name: Check no secrets were committed
+        run: |
+          set -euo pipefail
+          if grep -rnE '(sk-ant-|sk-proj-|pcsk_|xox[bap]-)[A-Za-z0-9_-]{10,}' workflows; then
+            echo "A key-like string was found in a workflow file."
+            exit 1
+          fi
+          echo "no key-like strings found"

@@ -1,0 +1,706 @@
+{
+  "name": "IT Ticket Triage Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ticket-triage",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "432c321b-94b6-447e-becd-6c76e58393c0",
+      "name": "Receive Ticket",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [0, 304],
+      "webhookId": "36440bc3-ea4b-4ee2-9261-39244f2b3a4c"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ticket-from",
+              "name": "from",
+              "value": "={{ ($json.body?.from ?? $json.from ?? \"unknown\").toString().trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "ticket-subject",
+              "name": "subject",
+              "value": "={{ ($json.body?.subject ?? $json.subject ?? \"\").toString().trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "ticket-body",
+              "name": "body",
+              "value": "={{ ($json.body?.body ?? \"\").toString().trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "ticket-dedupe",
+              "name": "dedupe_key",
+              "value": "={{ ($json.body?.event_id ?? \"\").toString().trim() || [($json.body?.from ?? \"\"), ($json.body?.subject ?? \"\"), ($json.body?.body ?? \"\")].join(\"|\").toLowerCase().hash(\"sha256\") }}",
+              "type": "string"
+            },
+            {
+              "id": "ticket-received",
+              "name": "received_at",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "de406d38-ca12-49db-996e-6f68fb9618e7",
+      "name": "Normalize Ticket",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [224, 304]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "content-check",
+              "leftValue": "={{ ($json.subject + \" \" + $json.body).trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0f41b814-c60b-4fce-a5d7-8d5324e80e8e",
+      "name": "Has Ticket Content?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [448, 304]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"status\": \"rejected\", \"reason\": \"Ticket has no subject and no body\" }",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "2d1b2ab3-b909-4e24-9b43-cb1177230d8a",
+      "name": "Reject Empty Ticket",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [672, 512]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "cachedResultName": "ticket-triage",
+          "mode": "id",
+          "value": "C0C7H08CC1Z"
+        },
+        "text": "={{ ({ auto: \":white_check_mark: AUTO-TRIAGED\", approved: \":white_check_mark: APPROVED BY HUMAN\", rejected: \":no_entry: DECLINED BY HUMAN\", timed_out: \":hourglass: NO DECISION IN TIME\" })[$json.decision] ?? $json.decision }} | *{{ $json.priority }}* | *{{ $json.category }}*\n*Subject:* {{ $json.subject }}\n*From:* {{ $json.from }}\n*System:* {{ $json.affected_system }}\n*Summary:* {{ $json.summary }}\n*Confidence:* {{ $json.confidence }}\n*Next step:* {{ ({ auto: \"sent to the support queue, no approval needed\", approved: \"sent to the support queue\", rejected: \"closed, no action taken\", timed_out: \"needs escalation, nobody answered within 1 hour\" })[$json.decision] ?? \"review manually\" }}\n*Suggested fix*{{ $json.sop_source ? \" (from \" + $json.sop_source + \")\" : \"\" }}:\n{{ $json.suggested_fix }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true
+        }
+      },
+      "id": "15983b16-6168-4275-870e-0f312d9069fc",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [2912, 304],
+      "webhookId": "5c2779ca-52d2-44c6-bf88-f4e653c23018",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "L4rkn6tkMsOzRzwy",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($('Build Ticket Record').first().json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "065a4952-341f-40a4-a70e-d8530b37c28d",
+      "name": "Return Classification",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [1792, 528]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO ticket_log (dedupe_key, from_email, subject, body, status, received_at)\nVALUES ($1::text, $2::text, $3::text, $4::text, 'processing', $5::timestamptz)\nON CONFLICT (dedupe_key) DO UPDATE\n  SET status = 'processing', attempts = ticket_log.attempts + 1, updated_at = now()\n  WHERE ticket_log.status = 'processing' AND ticket_log.updated_at < now() - interval '15 minutes'\nRETURNING id, attempts;",
+        "options": {
+          "connectionTimeout": 15,
+          "queryReplacement": "={{ [$json.dedupe_key, $json.from, $json.subject, $json.body, $json.received_at] }}"
+        }
+      },
+      "id": "4f44bcde-d59b-4cfd-9dde-592bdd2bb809",
+      "name": "Claim Ticket",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [672, 304],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "alwaysOutputData": true,
+      "notes": "Idempotency. One row per dedupe key. A second copy of the same ticket returns no row, so it is treated as a duplicate. A row stuck in 'processing' for 15 minutes can be claimed again.",
+      "credentials": {
+        "postgres": {
+          "id": "oLLrgw5SvNsom6qE",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "new-ticket-check",
+              "leftValue": "={{ $json.id ?? \"\" }}",
+              "operator": {
+                "operation": "notEmpty",
+                "singleValue": true,
+                "type": "string"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "id": "da275d75-0894-4cd9-a5dc-f4ea3b4f607b",
+      "name": "Is New Ticket?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [896, 304]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: \"duplicate\", dedupe_key: $('Normalize Ticket').first().json.dedupe_key, message: \"This ticket was already received. No new action was taken.\" }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "cbcfef7e-a6d0-4355-8dae-0cfc8baeb7e0",
+      "name": "Return Duplicate",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [1120, 528]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "JxcI7SlcYN2NKdW2"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "from",
+              "id": "from",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "subject",
+              "id": "subject",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "body",
+              "id": "body",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "body": "={{ $('Normalize Ticket').first().json.body }}",
+            "from": "={{ $('Normalize Ticket').first().json.from }}",
+            "subject": "={{ $('Normalize Ticket').first().json.subject }}"
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "d7fffe92-2429-4054-90c1-24b078c0f38e",
+      "name": "Classify Ticket",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [1120, 304],
+      "notes": "Calls the shared sub-workflow 'Ticket Classifier (shared)'. The eval workflow calls the same one."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "rec-ticket-id",
+              "name": "ticket_id",
+              "type": "string",
+              "value": "={{ $('Claim Ticket').first().json.id }}"
+            },
+            {
+              "id": "rec-dedupe",
+              "name": "dedupe_key",
+              "type": "string",
+              "value": "={{ $('Normalize Ticket').first().json.dedupe_key }}"
+            },
+            {
+              "id": "rec-received",
+              "name": "received_at",
+              "type": "string",
+              "value": "={{ $('Normalize Ticket').first().json.received_at }}"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "ead9c19b-9d47-4013-802f-091aa3cda39a",
+      "name": "Build Ticket Record",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [1344, 304]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE ticket_log\nSET status = 'classified', category = $2::text, priority = $3::text, affected_system = $4::text, summary = $5::text,\n    confidence = $6::numeric, needs_human = $7::boolean, reasoning = $8::text, prompt_version = $9::text, updated_at = now()\nWHERE id = $1::uuid\nRETURNING id, status;",
+        "options": {
+          "connectionTimeout": 15,
+          "queryReplacement": "={{ [$json.ticket_id, $json.category, $json.priority, $json.affected_system, $json.summary, $json.confidence, $json.needs_human, $json.reasoning, $json.prompt_version] }}"
+        }
+      },
+      "id": "c20ae70c-f896-4559-a607-c8213ced1ccb",
+      "name": "Save Classification",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [1568, 304],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "postgres": {
+          "id": "oLLrgw5SvNsom6qE",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "needs-human-check",
+              "leftValue": "={{ $('Build Ticket Record').first().json.needs_human }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "id": "dd77cd21-82a4-4f92-9e18-293582ce336e",
+      "name": "Needs Human?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [2016, 304]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "sendAndWait",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "cachedResultName": "ticket-triage",
+          "mode": "id",
+          "value": "C0C7H08CC1Z"
+        },
+        "message": "=:rotating_light: *Approval needed* | *{{ $('Build Ticket Record').first().json.priority }}* | *{{ $('Build Ticket Record').first().json.category }}*\n*Subject:* {{ $('Build Ticket Record').first().json.subject }}\n*From:* {{ $('Build Ticket Record').first().json.from }}\n*System:* {{ $('Build Ticket Record').first().json.affected_system }}\n*Summary:* {{ $('Build Ticket Record').first().json.summary }}\n*Confidence:* {{ $('Build Ticket Record').first().json.confidence }}\n*Review because:* {{ $('Build Ticket Record').first().json.human_reasons.join(\", \") }}\n*Suggested fix*{{ $('Suggest Fix').first().json.sop_source ? \" (from \" + $('Suggest Fix').first().json.sop_source + \")\" : \"\" }}:\n{{ $('Suggest Fix').first().json.suggested_fix ?? \"Not available (knowledge base lookup failed).\" }}\n\nApprove = accept this triage and send it to the support queue. Decline = close with no action.",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double"
+          }
+        },
+        "options": {
+          "limitWaitTime": {
+            "values": {}
+          },
+          "appendAttribution": false
+        }
+      },
+      "id": "c9396277-e7c5-40d9-a015-01b56872f7d8",
+      "name": "Ask Approval in Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [2240, 144],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "webhookId": "86246487-b222-4f40-99a3-e0363a6d0832",
+      "notes": "Human in the loop. The workflow pauses here until someone clicks Approve or Decline, or one hour passes.",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "L4rkn6tkMsOzRzwy",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "approved-check",
+              "leftValue": "={{ $json.data?.approved === true }}",
+              "operator": {
+                "operation": "true",
+                "singleValue": true,
+                "type": "boolean"
+              },
+              "rightValue": ""
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          }
+        },
+        "options": {}
+      },
+      "id": "36889b86-a442-4159-b12d-c5958187139a",
+      "name": "Was Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [2464, 144]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "out-ticket-id",
+              "name": "ticket_id",
+              "type": "string",
+              "value": "={{ $('Build Ticket Record').first().json.ticket_id }}"
+            },
+            {
+              "id": "out-decision",
+              "name": "decision",
+              "type": "string",
+              "value": "={{ $('Ask Approval in Slack').isExecuted ? ($('Ask Approval in Slack').first().json.data?.approved === true ? 'approved' : ($('Ask Approval in Slack').first().json.data?.approved === false ? 'rejected' : 'timed_out')) : 'auto' }}"
+            },
+            {
+              "id": "out-fix",
+              "name": "suggested_fix",
+              "type": "string",
+              "value": "={{ $('Suggest Fix').first().json.suggested_fix ?? 'Not available (knowledge base lookup failed).' }}"
+            },
+            {
+              "id": "out-sop",
+              "name": "sop_source",
+              "type": "string",
+              "value": "={{ $('Suggest Fix').first().json.sop_source ?? '' }}"
+            },
+            {
+              "id": "out-priority",
+              "name": "priority",
+              "type": "string",
+              "value": "={{ $('Build Ticket Record').first().json.priority }}"
+            },
+            {
+              "id": "out-category",
+              "name": "category",
+              "type": "string",
+              "value": "={{ $('Build Ticket Record').first().json.category }}"
+            },
+            {
+              "id": "out-subject",
+              "name": "subject",
+              "type": "string",
+              "value": "={{ $('Build Ticket Record').first().json.subject }}"
+            },
+            {
+              "id": "out-from",
+              "name": "from",
+              "type": "string",
+              "value": "={{ $('Build Ticket Record').first().json.from }}"
+            },
+            {
+              "id": "out-system",
+              "name": "affected_system",
+              "type": "string",
+              "value": "={{ $('Build Ticket Record').first().json.affected_system }}"
+            },
+            {
+              "id": "out-summary",
+              "name": "summary",
+              "type": "string",
+              "value": "={{ $('Build Ticket Record').first().json.summary }}"
+            },
+            {
+              "id": "out-confidence",
+              "name": "confidence",
+              "type": "number",
+              "value": "={{ $('Build Ticket Record').first().json.confidence }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c37e9642-6689-4dc1-ad4d-8594e96caf76",
+      "name": "Build Outcome",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [2688, 304]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE ticket_log\nSET status = CASE $2::text WHEN 'rejected' THEN 'rejected' WHEN 'timed_out' THEN 'timed_out' ELSE 'done' END,\n    decision = $2::text, suggested_fix = $3::text, sop_source = NULLIF($4::text, ''), updated_at = now()\nWHERE id = $1::uuid\nRETURNING id, status, decision;",
+        "options": {
+          "connectionTimeout": 15,
+          "queryReplacement": "={{ [$('Build Outcome').first().json.ticket_id, $('Build Outcome').first().json.decision, $('Build Outcome').first().json.suggested_fix, $('Build Outcome').first().json.sop_source] }}"
+        }
+      },
+      "id": "8bcd72d6-5194-4e68-b537-658e4562e558",
+      "name": "Save Outcome",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [3136, 304],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "postgres": {
+          "id": "oLLrgw5SvNsom6qE",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "id": "2e77f646-5c41-44d0-a340-e47c1c5be034",
+      "name": "Suggest Fix",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [1792, 304],
+      "parameters": {
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        },
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "4p3guL580nQpFslk"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "subject",
+              "id": "subject",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "summary",
+              "id": "summary",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "affected_system",
+              "id": "affected_system",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "affected_system": "={{ $('Build Ticket Record').first().json.affected_system }}",
+            "subject": "={{ $('Build Ticket Record').first().json.subject }}",
+            "summary": "={{ $('Build Ticket Record').first().json.summary }}"
+          }
+        }
+      },
+      "notes": "RAG. Calls 'Suggest Fix from SOPs (shared)': Pinecone search, then Claude writes a fix using only the SOP text. If this step fails, the ticket still completes.",
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    }
+  ],
+  "connections": {
+    "Receive Ticket": {
+      "main": [[{ "node": "Normalize Ticket", "type": "main", "index": 0 }]]
+    },
+    "Normalize Ticket": {
+      "main": [[{ "node": "Has Ticket Content?", "type": "main", "index": 0 }]]
+    },
+    "Has Ticket Content?": {
+      "main": [
+        [{ "node": "Claim Ticket", "type": "main", "index": 0 }],
+        [{ "node": "Reject Empty Ticket", "type": "main", "index": 0 }]
+      ]
+    },
+    "Claim Ticket": {
+      "main": [[{ "node": "Is New Ticket?", "type": "main", "index": 0 }]]
+    },
+    "Is New Ticket?": {
+      "main": [
+        [{ "node": "Classify Ticket", "type": "main", "index": 0 }],
+        [{ "node": "Return Duplicate", "type": "main", "index": 0 }]
+      ]
+    },
+    "Classify Ticket": {
+      "main": [[{ "node": "Build Ticket Record", "type": "main", "index": 0 }]]
+    },
+    "Build Ticket Record": {
+      "main": [[{ "node": "Save Classification", "type": "main", "index": 0 }]]
+    },
+    "Save Classification": {
+      "main": [
+        [
+          { "node": "Return Classification", "type": "main", "index": 0 },
+          { "node": "Suggest Fix", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Needs Human?": {
+      "main": [
+        [{ "node": "Ask Approval in Slack", "type": "main", "index": 0 }],
+        [{ "node": "Build Outcome", "type": "main", "index": 0 }]
+      ]
+    },
+    "Ask Approval in Slack": {
+      "main": [[{ "node": "Was Approved?", "type": "main", "index": 0 }]]
+    },
+    "Was Approved?": {
+      "main": [
+        [{ "node": "Build Outcome", "type": "main", "index": 0 }],
+        [{ "node": "Build Outcome", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Outcome": {
+      "main": [[{ "node": "Notify Slack", "type": "main", "index": 0 }]]
+    },
+    "Notify Slack": {
+      "main": [[{ "node": "Save Outcome", "type": "main", "index": 0 }]]
+    },
+    "Suggest Fix": {
+      "main": [[{ "node": "Needs Human?", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate",
+    "errorWorkflow": "3atti01oKFzqFAyP"
+  },
+  "nodeGroups": [
+    {
+      "id": "eccb8daa-32fa-4ed2-ba47-0816d59404a9",
+      "name": "Intake",
+      "nodeNames": ["Normalize Ticket", "Has Ticket Content?"],
+      "description": "Cleans the incoming ticket, builds a dedupe key, and stops empty tickets before any AI cost."
+    },
+    {
+      "id": "53cb1732-ebc8-4620-885e-a20f935b903e",
+      "name": "Duplicate check",
+      "nodeNames": ["Claim Ticket", "Is New Ticket?"],
+      "description": "Claims the ticket in Postgres. If the same ticket arrives twice, the second one stops here."
+    },
+    {
+      "id": "dcceef93-0b5a-4694-9ded-e15ca609b9e3",
+      "name": "Classification",
+      "nodeNames": ["Classify Ticket", "Build Ticket Record", "Save Classification"],
+      "description": "Calls the shared Claude classifier, builds one ticket record, and saves it."
+    },
+    {
+      "id": "c4a0750c-c9a4-41da-be89-57eaca81aeb2",
+      "name": "Suggested fix, approval and outcome",
+      "nodeNames": ["Suggest Fix", "Needs Human?", "Ask Approval in Slack", "Was Approved?", "Build Outcome", "Notify Slack", "Save Outcome"],
+      "description": "RAG suggests a fix from the SOPs. Sensitive tickets wait for Approve or Decline in Slack. The outcome is posted and saved."
+    }
+  ],
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp",
+    "templateCredsSetupCompleted": true
+  }
+}

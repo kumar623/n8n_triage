@@ -1,0 +1,109 @@
+{
+  "name": "Ticket Form (demo intake)",
+  "nodes": [
+    {
+      "id": "83421489-e06b-447b-904f-9a439e9d9ea5",
+      "name": "Ticket Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "authentication": "none",
+        "formTitle": "Submit an IT support ticket",
+        "formDescription": "Demo intake form. Your ticket is sent to the triage agent, and the result appears in the #ticket-triage Slack channel.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Your email",
+              "fieldType": "email",
+              "fieldName": "from",
+              "placeholder": "you@acme.com",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Subject",
+              "fieldType": "text",
+              "fieldName": "subject",
+              "placeholder": "Short title of the problem",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Describe the problem",
+              "fieldType": "textarea",
+              "fieldName": "body",
+              "placeholder": "What happened, who is affected, since when",
+              "requiredField": false
+            }
+          ]
+        },
+        "responseMode": "onReceived",
+        "options": {
+          "path": "it-ticket",
+          "buttonLabel": "Send ticket",
+          "respondWithOptions": {
+            "values": {
+              "respondWith": "text",
+              "formSubmittedText": "Ticket received. Open the #ticket-triage channel in Slack to see the result."
+            }
+          }
+        }
+      },
+      "webhookId": "7a91ed9f-fbe5-4c1b-a3df-d55739da8470"
+    },
+    {
+      "id": "9d6427f0-7972-49ab-b261-2c486cf7f9ea",
+      "name": "Send to Triage Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR-N8N-HOST/webhook/ticket-triage",
+        "authentication": "none",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ from: $json.from, subject: $json.subject, body: $json.body ?? \"\" }) }}",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    }
+  ],
+  "connections": {
+    "Ticket Form": {
+      "main": [
+        [
+          {
+            "node": "Send to Triage Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "nodeGroups": [],
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "name": "Ticket Triage - Error Alerts",
+  "nodes": [
+    {
+      "id": "75e913a5-995f-4636-97fd-be203411eb94",
+      "name": "On Workflow Error",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "53642a21-4095-4c7e-8db4-07094324c45a",
+      "name": "Alert Slack On Failure",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "authentication": "oAuth2",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#ticket-triage"
+        },
+        "messageType": "text",
+        "text": "=:x: *Workflow failed:* {{ $json.workflow?.name ?? \"unknown workflow\" }}\n*Failed at node:* {{ $json.execution?.lastNodeExecuted ?? \"unknown\" }}\n*Error:* {{ $json.execution?.error?.message ?? $json.trigger?.error?.message ?? \"no message\" }}\n*Execution:* {{ $json.execution?.url ?? \"not available\" }}\n*What to do:* open the execution link, read the failed node, then follow the troubleshooting guide.",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "webhookId": "b67ff1b6-73db-44f3-a6b2-503c3bf0294d",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "L4rkn6tkMsOzRzwy",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "On Workflow Error": {
+      "main": [
+        [
+          {
+            "node": "Alert Slack On Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "nodeGroups": [],
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  }
+}
