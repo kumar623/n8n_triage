@@ -6,6 +6,8 @@ A chat helpdesk agent sits in front of it. It is an n8n AI Agent with memory and
 
 The same pattern was then reused for a second department: an **HR helpdesk agent** that answers from HR policies, using a **Pinecone metadata filter** so each person only gets the policies for their country and role.
 
+Both agents sit behind **one chat**. A small router decides whether each message is IT or HR and hands it to the right specialist agent.
+
 Status: working prototype, built as a personal project. It runs live on an n8n cloud trial. It is not a client production system.
 
 ## What it does
@@ -96,6 +98,8 @@ All files are in `workflows/`. They are n8n workflow JSON and can be imported wi
 | `15_hr_policy_search_eval.json` | HR Policy Search - Eval (filter on vs off) | 14 labelled questions, each run with the filter on and off |
 | `16_hr_helpdesk_agent_chat.json` | HR Helpdesk Agent (chat) | AI Agent with memory and two tools: filtered policy search, my leave balance |
 | `17_hr_agent_chat_test.json` | HR Agent - Chat Test | Scripted chat with two different employees |
+| `18_employee_helpdesk_front_door.json` | Employee Helpdesk (IT + HR front door) | One chat. Routes each message to the IT agent or the HR agent |
+| `19_employee_helpdesk_mixed_chat_test.json` | Employee Helpdesk - Mixed Chat Test | Scripted 7-turn chat that switches between IT and HR |
 
 The files hold credential names and ids only. No keys or passwords are stored in workflows; they live in the n8n credential store.
 
@@ -238,6 +242,43 @@ The one miss with the filter on (run 1): a contractor asked about paid sick leav
 
 One fix from testing: asked "how many days of leave do I get?", the agent first answered from the balance tool, with the right number but no policy source. The balance tool no longer returns the yearly total, so the entitlement has to come from the policy.
 
+## One chat for IT and HR: router plus specialist agents
+
+Workflow `18`. This is the router pattern for multiple agents.
+
+```mermaid
+flowchart LR
+    C[Employee Helpdesk Chat] --> G[Guard: mask PII, check injection]
+    G --> L[(Load last route for this session)]
+    L --> R[Classify Topic: Claude Haiku, fixed schema]
+    R --> D[Decide Route: code]
+    D --> S{Route}
+    S -- it --> IT[IT Helpdesk Agent, workflow 11]
+    S -- hr --> HR[HR Helpdesk Agent, workflow 16]
+    S -- other --> X[Fixed reply, no agent]
+```
+
+How it works:
+
+1. The guard masks the message, so the router model never sees personal data.
+2. Claude Haiku labels the message with one of four values: `it`, `hr`, `follow_up`, `other`. The output is a fixed schema, so it cannot return anything else.
+3. Code decides the route. `follow_up` (for example "yes", "no thanks", or just an email address) goes to whichever specialist handled the last topic, stored in `helpdesk_sessions.last_route`. With no last topic, the chat asks "IT or HR?".
+4. The chosen agent is called as a sub-workflow. Each agent workflow has two ways in: its own Chat Trigger and a "Called by Front Door" trigger.
+5. `other` gets a fixed reply. No agent runs, so an off-topic question costs one small model call.
+
+Why a router and not one agent with five tools:
+
+- Each specialist keeps its own tested prompt, tools and evals. Adding HR did not change the IT agent's behaviour, and adding a third department would not change either.
+- Each specialist only holds the tools for its own job, which keeps the blast radius small (the HR agent cannot raise IT tickets).
+- The cost is one extra small model call per message, and the router can be wrong.
+
+Why not a supervisor agent that calls the specialists as tools: the specialists need the conversation (confirming a ticket, remembering the question while asking for an email). When they run as sub-workflows with their own memory they keep that. A supervisor would have to re-describe the conversation on every call.
+
+Shared and separate state:
+
+- **Identity is shared.** The email typed once is stored per chat session and used by both agents.
+- **Memory is separate.** Each specialist has its own conversation thread for the session, so one agent never sees the other's tool calls.
+
 ## How the RAG step avoids made-up answers
 
 1. **Score gate:** only SOPs with a similarity score of 0.35 or higher are passed to the model. Below that, the answer is "No matching SOP".
@@ -309,6 +350,18 @@ Two single-message checks after the prompt rewrite: "raise ticket as P1" for a p
 | B1 | UK manager | How many days of annual leave do I get? | 25 days plus 8 bank holidays, Source: HR-002 Annual leave (UK) |
 | B2 | same | How do I start a performance improvement plan? | Steps, Source: HR-011 |
 
+**Combined chat**, workflow `19`, one session, 7 turns:
+
+| Turn | Message | Routed to | Result |
+|---|---|---|---|
+| 1 | hi | none | Fixed welcome, no agent |
+| 2 | Account locked out, with an email | IT | Answered from the SOP, offered a ticket |
+| 3 | How many days of annual leave do I get? | HR | 18 days, Source: HR-001. The email from turn 2 was reused |
+| 4 | And how many do I have left? | HR | 12 left, 6 used |
+| 5 | Laptop screen flickers on HDMI | IT | No approved guide, offered a ticket |
+| 6 | no thanks | IT (follow-up) | Polite close, no ticket raised |
+| 7 | What is the weather in Chennai today? | none | Fixed reply, no agent |
+
 Run the evals after every prompt, SOP, threshold or model change.
 
 ## Dependencies
@@ -337,6 +390,7 @@ Run the evals after every prompt, SOP, threshold or model change.
 7. Run 06 once to load the SOPs. Run 07 and 08 and check the scores.
 8. Publish 02, 03, 04, 10, then 01, then 11. Open the Chat Trigger in 11 to copy the chat URL, put it in 12, and run 12.
 9. HR: import 13 to 17. Run 13 once to load the policies. Publish 14. In 15 and 16, re-point the sub-workflow nodes to the imported 14 (and 10 in 16). Run 15 and check both scores. Publish 16, copy its chat URL into 17, and run 17.
+10. Combined chat: import 18 and 19. In 18, re-point "Ask IT Agent" to 11, "Ask HR Agent" to 16 and the guard to 10. Publish 18, copy its chat URL into 19, and run 19.
 
 ## Troubleshooting
 
@@ -374,6 +428,9 @@ Where to look first: n8n **Executions** list, open the failed run, click the red
 
 - The webhook requires a secret header, but the demo form page and the chat page are public. Unpublish them when they are not in use.
 - The chat has no login. It trusts the email the user types, so anyone could ask for another person's ticket list. In real use the email must come from single sign-on, not from the chat text.
+- The router sees one message and the last topic, not the whole conversation. A follow-up that is long and does not name its subject could be sent to the wrong specialist. The 7-turn test is one scripted conversation, not a routing eval.
+- The specialists keep separate memory, so the HR agent does not know what was said to the IT agent in the same chat.
+- The IT agent sometimes repeats a tag such as `[EMAIL_1]` back to the user. It shows the masking is real, but it reads oddly.
 - In the HR chat, typing another person's email switches the session to that person's country, role and leave balance. This is the same no-login limit. The metadata filter itself is sound; what feeds it must be a verified identity.
 - The HR knowledge base is 14 short made-up policies for two countries. Each policy is one chunk. Long real policies would need chunking, and every chunk would need the same metadata.
 - The HR eval is 14 questions written by the same person who wrote the policies. It shows the effect of the filter, not production accuracy.

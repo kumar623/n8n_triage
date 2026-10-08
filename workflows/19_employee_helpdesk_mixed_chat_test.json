@@ -1,0 +1,375 @@
+{
+  "name": "Employee Helpdesk - Mixed Chat Test",
+  "nodes": [
+    {
+      "name": "Run Mixed Chat Test",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "name": "New Test Session",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "test-session",
+              "name": "session_id",
+              "value": "={{ \"mixed-test-\" + $now.toMillis() }}",
+              "type": "string"
+            },
+            {
+              "id": "test-url",
+              "name": "chat_url",
+              "value": "https://YOUR-N8N-HOST/webhook/YOUR-FRONT-DOOR-CHAT-WEBHOOK-ID/chat",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "name": "T1 Greeting",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $(\"New Test Session\").first().json.chat_url }}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: \"sendMessage\", sessionId: $(\"New Test Session\").first().json.session_id, chatInput: \"hi\" }) }}",
+        "options": {
+          "timeout": 90000
+        }
+      }
+    },
+    {
+      "name": "T2 IT Problem With Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $(\"New Test Session\").first().json.chat_url }}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: \"sendMessage\", sessionId: $(\"New Test Session\").first().json.session_id, chatInput: \"My account is locked out after too many wrong password tries. My work email is priya.nair@example.com\" }) }}",
+        "options": {
+          "timeout": 90000
+        }
+      }
+    },
+    {
+      "name": "T3 HR Question",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $(\"New Test Session\").first().json.chat_url }}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: \"sendMessage\", sessionId: $(\"New Test Session\").first().json.session_id, chatInput: \"How many days of annual leave do I get?\" }) }}",
+        "options": {
+          "timeout": 90000
+        }
+      }
+    },
+    {
+      "name": "T4 HR Follow Up",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1100,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $(\"New Test Session\").first().json.chat_url }}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: \"sendMessage\", sessionId: $(\"New Test Session\").first().json.session_id, chatInput: \"And how many do I have left?\" }) }}",
+        "options": {
+          "timeout": 90000
+        }
+      }
+    },
+    {
+      "name": "T5 IT Unknown Problem",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1320,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $(\"New Test Session\").first().json.chat_url }}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: \"sendMessage\", sessionId: $(\"New Test Session\").first().json.session_id, chatInput: \"My laptop screen flickers when I plug in the HDMI monitor. Restarting did not help.\" }) }}",
+        "options": {
+          "timeout": 90000
+        }
+      }
+    },
+    {
+      "name": "T6 Short Follow Up",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1540,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $(\"New Test Session\").first().json.chat_url }}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: \"sendMessage\", sessionId: $(\"New Test Session\").first().json.session_id, chatInput: \"no thanks\" }) }}",
+        "options": {
+          "timeout": 90000
+        }
+      }
+    },
+    {
+      "name": "T7 Out Of Scope",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1760,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $(\"New Test Session\").first().json.chat_url }}",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: \"sendMessage\", sessionId: $(\"New Test Session\").first().json.session_id, chatInput: \"What is the weather in Chennai today?\" }) }}",
+        "options": {
+          "timeout": 90000
+        }
+      }
+    },
+    {
+      "name": "Collect Replies",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1980,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c-0",
+              "name": "session_id",
+              "value": "={{ $(\"New Test Session\").first().json.session_id }}",
+              "type": "string"
+            },
+            {
+              "id": "c-1",
+              "name": "t1_greeting",
+              "value": "={{ $(\"T1 Greeting\").first().json.output }}",
+              "type": "string"
+            },
+            {
+              "id": "c-2",
+              "name": "t2_it_problem",
+              "value": "={{ $(\"T2 IT Problem With Email\").first().json.output }}",
+              "type": "string"
+            },
+            {
+              "id": "c-3",
+              "name": "t3_hr_question",
+              "value": "={{ $(\"T3 HR Question\").first().json.output }}",
+              "type": "string"
+            },
+            {
+              "id": "c-4",
+              "name": "t4_hr_follow_up",
+              "value": "={{ $(\"T4 HR Follow Up\").first().json.output }}",
+              "type": "string"
+            },
+            {
+              "id": "c-5",
+              "name": "t5_it_unknown_problem",
+              "value": "={{ $(\"T5 IT Unknown Problem\").first().json.output }}",
+              "type": "string"
+            },
+            {
+              "id": "c-6",
+              "name": "t6_short_follow_up",
+              "value": "={{ $(\"T6 Short Follow Up\").first().json.output }}",
+              "type": "string"
+            },
+            {
+              "id": "c-7",
+              "name": "t7_out_of_scope",
+              "value": "={{ $(\"T7 Out Of Scope\").first().json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Run Mixed Chat Test": {
+      "main": [
+        [
+          {
+            "node": "New Test Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New Test Session": {
+      "main": [
+        [
+          {
+            "node": "T1 Greeting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "T1 Greeting": {
+      "main": [
+        [
+          {
+            "node": "T2 IT Problem With Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "T2 IT Problem With Email": {
+      "main": [
+        [
+          {
+            "node": "T3 HR Question",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "T3 HR Question": {
+      "main": [
+        [
+          {
+            "node": "T4 HR Follow Up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "T4 HR Follow Up": {
+      "main": [
+        [
+          {
+            "node": "T5 IT Unknown Problem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "T5 IT Unknown Problem": {
+      "main": [
+        [
+          {
+            "node": "T6 Short Follow Up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "T6 Short Follow Up": {
+      "main": [
+        [
+          {
+            "node": "T7 Out Of Scope",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "T7 Out Of Scope": {
+      "main": [
+        [
+          {
+            "node": "Collect Replies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "nodeGroups": [
+    {
+      "name": "One chat, IT and HR mixed",
+      "nodeNames": [
+        "New Test Session",
+        "T1 Greeting",
+        "T2 IT Problem With Email",
+        "T3 HR Question",
+        "T4 HR Follow Up",
+        "T5 IT Unknown Problem",
+        "T6 Short Follow Up",
+        "T7 Out Of Scope",
+        "Collect Replies"
+      ],
+      "description": "One session switches between IT and HR. Checks routing, follow-ups, the shared email and an out-of-scope question."
+    }
+  ],
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  }
+}

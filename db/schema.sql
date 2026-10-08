@@ -55,6 +55,7 @@ comment on table public.eval_runs is
 create table if not exists public.helpdesk_sessions (
   session_id text primary key,
   requester_email text,
+  last_route text check (last_route in ('it', 'hr')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

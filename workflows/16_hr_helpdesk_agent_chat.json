@@ -245,7 +245,7 @@
       ],
       "parameters": {
         "sessionIdType": "customKey",
-        "sessionKey": "={{ $('Prepare Session').first().json.session_id }}",
+        "sessionKey": "={{ $('Prepare Session').first().json.session_id + ':hr' }}",
         "tableName": "helpdesk_chat_memory",
         "contextWindowLength": 8
       },
@@ -347,6 +347,31 @@
           "name": "Postgres account 2"
         }
       }
+    },
+    {
+      "name": "Called by Front Door",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        520
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "sessionId",
+              "type": "string"
+            },
+            {
+              "name": "chatInput",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "notes": "Second way in. The combined Employee Helpdesk chat calls this agent as a sub-workflow with the same two fields the Chat Trigger gives."
     }
   ],
   "connections": {
@@ -377,17 +402,6 @@
         [
           {
             "node": "Guard Chat Message",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Guard Chat Message": {
-      "main": [
-        [
-          {
-            "node": "Strong Injection Signal?",
             "type": "main",
             "index": 0
           }
@@ -451,6 +465,28 @@
           {
             "node": "HR Helpdesk Agent",
             "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guard Chat Message": {
+      "main": [
+        [
+          {
+            "node": "Strong Injection Signal?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Called by Front Door": {
+      "main": [
+        [
+          {
+            "node": "Prepare Session",
+            "type": "main",
             "index": 0
           }
         ]
