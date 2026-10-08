@@ -6,7 +6,8 @@
         "httpMethod": "POST",
         "path": "ticket-triage",
         "responseMode": "responseNode",
-        "options": {}
+        "options": {},
+        "authentication": "headerAuth"
       },
       "id": "432c321b-94b6-447e-becd-6c76e58393c0",
       "name": "Receive Ticket",
@@ -16,7 +17,13 @@
         0,
         304
       ],
-      "webhookId": "36440bc3-ea4b-4ee2-9261-39244f2b3a4c"
+      "webhookId": "36440bc3-ea4b-4ee2-9261-39244f2b3a4c",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "5oGXCorFzJlmqrX0",
+          "name": "Header Auth account"
+        }
+      }
     },
     {
       "parameters": {
@@ -126,7 +133,7 @@
           "mode": "id",
           "value": "C0C7H08CC1Z"
         },
-        "text": "={{ ({ auto: \":white_check_mark: AUTO-TRIAGED\", approved: \":white_check_mark: APPROVED BY HUMAN\", rejected: \":no_entry: DECLINED BY HUMAN\", timed_out: \":hourglass: NO DECISION IN TIME\" })[$('Build Outcome').first().json.decision] ?? $('Build Outcome').first().json.decision }} | *{{ $('Build Outcome').first().json.priority }}* | *{{ $('Build Outcome').first().json.category }}*\n*Subject:* {{ $('Build Outcome').first().json.subject }}\n*From:* {{ $('Build Outcome').first().json.from }}\n*System:* {{ $('Build Outcome').first().json.affected_system }}\n*Summary:* {{ $('Build Outcome').first().json.summary }}\n*Confidence:* {{ $('Build Outcome').first().json.confidence }}\n*Jira:* {{ ($('Create Jira Issue').isExecuted && $('Create Jira Issue').first().json.key) ? \"<\" + $('Create Jira Issue').first().json.self.split(\"/rest/\")[0] + \"/browse/\" + $('Create Jira Issue').first().json.key + \"|\" + $('Create Jira Issue').first().json.key + \">\" : (({ rejected: \"not created (declined)\", timed_out: \"not created (nobody answered within 1 hour, needs escalation)\" })[$('Build Outcome').first().json.decision] ?? \"not created (Jira step failed, check the execution)\") }}\n*Suggested fix*{{ $('Build Outcome').first().json.sop_source ? \" (from \" + $('Build Outcome').first().json.sop_source + \")\" : \"\" }}:\n{{ $('Build Outcome').first().json.suggested_fix }}",
+        "text": "={{ ({ auto: \":white_check_mark: AUTO-TRIAGED\", approved: \":white_check_mark: APPROVED BY HUMAN\", rejected: \":no_entry: DECLINED BY HUMAN\", timed_out: \":hourglass: NO DECISION, EVEN AFTER ESCALATION\" })[$('Build Outcome').first().json.decision] ?? $('Build Outcome').first().json.decision }}{{ ($('Build Outcome').first().json.escalated && $('Build Outcome').first().json.decision !== \"timed_out\") ? \" (after escalation)\" : \"\" }} | *{{ $('Build Outcome').first().json.priority }}* | *{{ $('Build Outcome').first().json.category }}*\n*Subject:* {{ $('Build Outcome').first().json.subject }}\n*From:* {{ $('Build Outcome').first().json.from }}\n*System:* {{ $('Build Outcome').first().json.affected_system }}\n*Summary:* {{ $('Build Outcome').first().json.summary }}\n*Confidence:* {{ $('Build Outcome').first().json.confidence }}\n*Jira:* {{ ($('Create Jira Issue').isExecuted && $('Create Jira Issue').first().json.key) ? \"<\" + $('Create Jira Issue').first().json.self.split(\"/rest/\")[0] + \"/browse/\" + $('Create Jira Issue').first().json.key + \"|\" + $('Create Jira Issue').first().json.key + \">\" : (({ rejected: \"not created (declined)\", timed_out: \"not created (nobody answered, needs manual follow-up)\" })[$('Build Outcome').first().json.decision] ?? \"not created (Jira step failed, check the execution)\") }}\n*Suggested fix*{{ $('Build Outcome').first().json.sop_source ? \" (from \" + $('Build Outcome').first().json.sop_source + \")\" : \"\" }}:\n{{ $('Build Outcome').first().json.suggested_fix }}",
         "otherOptions": {
           "includeLinkToWorkflow": false,
           "mrkdwn": true
@@ -137,7 +144,7 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.7,
       "position": [
-        3584,
+        4480,
         304
       ],
       "webhookId": "5c2779ca-52d2-44c6-bf88-f4e653c23018",
@@ -402,7 +409,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        2240,
+        2688,
         304
       ]
     },
@@ -417,7 +424,7 @@
           "mode": "id",
           "value": "C0C7H08CC1Z"
         },
-        "message": "=:rotating_light: *Approval needed* | *{{ $('Build Ticket Record').first().json.priority }}* | *{{ $('Build Ticket Record').first().json.category }}*\n*Subject:* {{ $('Build Ticket Record').first().json.subject }}\n*From:* {{ $('Build Ticket Record').first().json.from }}\n*System:* {{ $('Build Ticket Record').first().json.affected_system }}\n*Summary:* {{ $('Build Ticket Record').first().json.summary }}\n*Confidence:* {{ $('Build Ticket Record').first().json.confidence }}\n*Review because:* {{ $('Build Ticket Record').first().json.human_reasons.join(\", \") }}\n*Suggested fix*{{ $('Suggest Fix').first().json.sop_source ? \" (from \" + $('Suggest Fix').first().json.sop_source + \")\" : \"\" }}:\n{{ $('Suggest Fix').first().json.suggested_fix ?? \"Not available (knowledge base lookup failed).\" }}\n\nApprove = accept this triage and send it to the support queue. Decline = close with no action.",
+        "message": "={{ $('Build Ticket Record').first().json.priority === 'P1' ? '<!channel> ' : '' }}:rotating_light: *Approval needed* | *{{ $('Build Ticket Record').first().json.priority }}* | *{{ $('Build Ticket Record').first().json.category }}*\n*Subject:* {{ $('Build Ticket Record').first().json.subject }}\n*From:* {{ $('Build Ticket Record').first().json.from }}\n*System:* {{ $('Build Ticket Record').first().json.affected_system }}\n*Summary:* {{ $('Build Ticket Record').first().json.summary }}\n*Confidence:* {{ $('Build Ticket Record').first().json.confidence }}\n*Review because:* {{ $('Build Ticket Record').first().json.human_reasons.join(\", \") }}\n*Suggested fix*{{ $('Suggest Fix').first().json.sop_source ? \" (from \" + $('Suggest Fix').first().json.sop_source + \")\" : \"\" }}:\n{{ $('Suggest Fix').first().json.suggested_fix ?? \"Not available (knowledge base lookup failed).\" }}\n\nApprove = accept this triage and create a Jira issue. Decline = close with no action.",
         "approvalOptions": {
           "values": {
             "approvalType": "double"
@@ -425,7 +432,11 @@
         },
         "options": {
           "limitWaitTime": {
-            "values": {}
+            "values": {
+              "limitType": "afterTimeInterval",
+              "resumeAmount": 1,
+              "resumeUnit": "hours"
+            }
           },
           "appendAttribution": false
         }
@@ -435,7 +446,7 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.7,
       "position": [
-        2464,
+        2912,
         144
       ],
       "retryOnFail": true,
@@ -480,7 +491,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        2688,
+        3584,
         144
       ]
     },
@@ -498,7 +509,7 @@
               "id": "out-decision",
               "name": "decision",
               "type": "string",
-              "value": "={{ $('Ask Approval in Slack').isExecuted ? ($('Ask Approval in Slack').first().json.data?.approved === true ? 'approved' : ($('Ask Approval in Slack').first().json.data?.approved === false ? 'rejected' : 'timed_out')) : 'auto' }}"
+              "value": "={{ $('Ask Approval in Slack').isExecuted ? [($('Escalate Approval in Slack').isExecuted ? $('Escalate Approval in Slack').first().json.data?.approved : $('Ask Approval in Slack').first().json.data?.approved)].map(a => a === true ? 'approved' : (a === false ? 'rejected' : 'timed_out'))[0] : 'auto' }}"
             },
             {
               "id": "out-fix",
@@ -553,6 +564,12 @@
               "name": "confidence",
               "type": "number",
               "value": "={{ $('Build Ticket Record').first().json.confidence }}"
+            },
+            {
+              "id": "out-escalated",
+              "name": "escalated",
+              "type": "boolean",
+              "value": "={{ $('Escalate Approval in Slack').isExecuted }}"
             }
           ]
         },
@@ -563,17 +580,17 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.5,
       "position": [
-        2912,
+        3808,
         304
       ]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE ticket_log\nSET status = CASE $2::text WHEN 'rejected' THEN 'rejected' WHEN 'timed_out' THEN 'timed_out' ELSE 'done' END,\n    decision = $2::text, suggested_fix = $3::text, sop_source = NULLIF($4::text, ''), jira_key = NULLIF($5::text, ''), updated_at = now()\nWHERE id = $1::uuid\nRETURNING id, status, decision, jira_key;",
+        "query": "UPDATE ticket_log\nSET status = CASE $2::text WHEN 'rejected' THEN 'rejected' WHEN 'timed_out' THEN 'timed_out' ELSE 'done' END,\n    decision = $2::text, suggested_fix = $3::text, sop_source = NULLIF($4::text, ''), jira_key = NULLIF($5::text, ''),\n    escalated = $6::boolean, updated_at = now()\nWHERE id = $1::uuid\nRETURNING id, status, decision, jira_key, escalated;",
         "options": {
           "connectionTimeout": 15,
-          "queryReplacement": "={{ [$('Build Outcome').first().json.ticket_id, $('Build Outcome').first().json.decision, $('Build Outcome').first().json.suggested_fix, $('Build Outcome').first().json.sop_source, ($('Create Jira Issue').isExecuted ? ($('Create Jira Issue').first().json.key ?? '') : '')] }}"
+          "queryReplacement": "={{ [$('Build Outcome').first().json.ticket_id, $('Build Outcome').first().json.decision, $('Build Outcome').first().json.suggested_fix, $('Build Outcome').first().json.sop_source, ($('Create Jira Issue').isExecuted ? ($('Create Jira Issue').first().json.key ?? '') : ''), $('Build Outcome').first().json.escalated] }}"
         }
       },
       "id": "8bcd72d6-5194-4e68-b537-658e4562e558",
@@ -581,7 +598,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        3808,
+        4704,
         304
       ],
       "retryOnFail": true,
@@ -664,7 +681,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3136,
+        4032,
         304
       ],
       "parameters": {
@@ -706,7 +723,7 @@
       "type": "n8n-nodes-base.jira",
       "typeVersion": 1,
       "position": [
-        3360,
+        4256,
         144
       ],
       "parameters": {
@@ -744,6 +761,157 @@
         "jiraSoftwareCloudApi": {
           "id": "n6LJ7A8X3t4EYBap",
           "name": "Jira SW Cloud account"
+        }
+      }
+    },
+    {
+      "id": "c3d2e9f4-7d30-4e5c-9a41-9f8dae0b2a33",
+      "name": "Got a Decision?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3136,
+        144
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "decision-made",
+              "leftValue": "={{ $json.data?.approved === true || $json.data?.approved === false }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "d4e3fa05-8e41-4f6d-8b52-a09ebf1c3b44",
+      "name": "Escalate Approval in Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        3360,
+        0
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "message",
+        "operation": "sendAndWait",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "cachedResultName": "ticket-triage",
+          "mode": "id",
+          "value": "C0C7H08CC1Z"
+        },
+        "message": "=<!channel> :warning: *ESCALATION: nobody answered the first approval request* | *{{ $('Build Ticket Record').first().json.priority }}* | *{{ $('Build Ticket Record').first().json.category }}*\n*Subject:* {{ $('Build Ticket Record').first().json.subject }}\n*From:* {{ $('Build Ticket Record').first().json.from }}\n*System:* {{ $('Build Ticket Record').first().json.affected_system }}\n*Summary:* {{ $('Build Ticket Record').first().json.summary }}\n*Review because:* {{ $('Build Ticket Record').first().json.human_reasons.join(\", \") }}\n\nApprove = accept this triage and create a Jira issue. Decline = close with no action. If nobody answers this one, the ticket is logged as timed out.",
+        "responseType": "approval",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "Approve",
+            "disapproveLabel": "Decline"
+          }
+        },
+        "options": {
+          "limitWaitTime": {
+            "values": {
+              "limitType": "afterTimeInterval",
+              "resumeAmount": 1,
+              "resumeUnit": "hours"
+            }
+          },
+          "appendAttribution": false
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "notes": "Escalation. Runs only when the first approval request got no click. Posts a second request with a channel mention and waits again.",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "L4rkn6tkMsOzRzwy",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "id": "e5f40b16-9f52-4a7e-9c63-b1afc02d4c55",
+      "name": "Is P1?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2240,
+        304
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "p1-check",
+              "leftValue": "={{ $('Build Ticket Record').first().json.priority }}",
+              "rightValue": "P1",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "f6051c27-a063-4b8f-8d74-c2b0d13e5d66",
+      "name": "Email P1 Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2464,
+        464
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "YOUR-ALERT-ADDRESS@example.com",
+        "subject": "=[P1] {{ $('Build Ticket Record').first().json.subject }}",
+        "emailType": "text",
+        "message": "=A P1 ticket needs attention.\n\nSubject: {{ $('Build Ticket Record').first().json.subject }}\nFrom: {{ $('Build Ticket Record').first().json.from }}\nCategory: {{ $('Build Ticket Record').first().json.category }}\nAffected system: {{ $('Build Ticket Record').first().json.affected_system }}\nSummary: {{ $('Build Ticket Record').first().json.summary }}\nConfidence: {{ $('Build Ticket Record').first().json.confidence }}\n\nSuggested fix{{ $('Suggest Fix').first().json.sop_source ? ' (from ' + $('Suggest Fix').first().json.sop_source + ')' : '' }}:\n{{ $('Suggest Fix').first().json.suggested_fix ?? 'Not available.' }}\n\nAn approval request is waiting in the Slack channel #ticket-triage.",
+        "options": {
+          "appendAttribution": false,
+          "senderName": "IT Ticket Triage"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput",
+      "notes": "P1 notification by email. Sent before the Slack approval request, so the on-call person hears about it on a second channel.",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "RNJdk2VjNYrfvNad",
+          "name": "Gmail account"
         }
       }
     }
@@ -873,7 +1041,7 @@
       "main": [
         [
           {
-            "node": "Was Approved?",
+            "node": "Got a Decision?",
             "type": "main",
             "index": 0
           }
@@ -924,7 +1092,7 @@
       "main": [
         [
           {
-            "node": "Needs Human?",
+            "node": "Is P1?",
             "type": "main",
             "index": 0
           }
@@ -965,6 +1133,64 @@
         [
           {
             "node": "Notify Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is P1?": {
+      "main": [
+        [
+          {
+            "node": "Email P1 Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Needs Human?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email P1 Alert": {
+      "main": [
+        [
+          {
+            "node": "Needs Human?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Got a Decision?": {
+      "main": [
+        [
+          {
+            "node": "Was Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Escalate Approval in Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalate Approval in Slack": {
+      "main": [
+        [
+          {
+            "node": "Was Approved?",
             "type": "main",
             "index": 0
           }
@@ -1012,12 +1238,16 @@
       "name": "Suggested fix and approval",
       "nodeNames": [
         "Suggest Fix",
+        "Is P1?",
+        "Email P1 Alert",
         "Needs Human?",
         "Ask Approval in Slack",
+        "Got a Decision?",
+        "Escalate Approval in Slack",
         "Was Approved?",
         "Build Outcome"
       ],
-      "description": "RAG suggests a fix from the SOPs. Sensitive tickets wait for Approve or Decline in Slack."
+      "description": "RAG suggests a fix. P1 tickets send an email alert. Sensitive tickets wait for Approve or Decline in Slack, with an escalation if nobody clicks."
     },
     {
       "name": "Action and log",

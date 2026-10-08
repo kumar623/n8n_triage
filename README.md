@@ -6,16 +6,17 @@ Status: working prototype, built as a personal project. It runs live on an n8n c
 
 ## What it does
 
-1. A ticket arrives at a webhook (from a form, an email tool, or any system that can send JSON).
+1. A ticket arrives at a webhook (from a form, an email tool, or any system that can send JSON). The caller must send a secret header.
 2. Empty tickets are rejected before any AI cost.
 3. The ticket is claimed in Postgres. If the same ticket arrives twice, the second copy stops here.
 4. Claude Haiku classifies it: category, priority, affected system, summary, confidence.
 5. Code re-checks the model output. P1, security, low confidence, or bad output forces a human review.
 6. RAG: the ticket is matched against SOPs in Pinecone, and Claude writes a short fix using only the matching SOP.
-7. Tickets that need a human wait in Slack for Approve or Decline (1 hour limit).
-8. Auto-triaged and approved tickets create a Jira issue with the priority, triage details and suggested fix. Declined and timed-out tickets create nothing.
-9. The outcome, with the Jira link, is posted to Slack and saved in Postgres.
-10. If the workflow fails, a separate error workflow alerts Slack.
+7. P1 tickets send an email alert through Gmail.
+8. Tickets that need a human wait in Slack for Approve or Decline. If nobody clicks within 1 hour, a second, escalated request is posted with a channel mention. If that also gets no click within 1 hour, the ticket is logged as timed out.
+9. Auto-triaged and approved tickets create a Jira issue with the priority, triage details and suggested fix. Declined and timed-out tickets create nothing.
+10. The outcome, with the Jira link, is posted to Slack and saved in Postgres.
+11. If the workflow fails, a separate error workflow alerts Slack.
 
 ## Diagram
 
@@ -32,9 +33,14 @@ flowchart LR
     G --> H[(Save Classification)]
     H --> H1[200 Return Classification to sender]
     H1 --> R[Suggest Fix: sub-workflow, Pinecone + Claude]
-    R --> I{Needs human?}
-    I -- yes --> J[Slack: Approve or Decline]
-    J --> K[Build Outcome]
+    R --> P{P1?}
+    P -- yes --> P1[Gmail: P1 alert]
+    P1 --> I{Needs human?}
+    P -- no --> I
+    I -- yes --> J[Slack: Approve or Decline, 1 hour]
+    J -- clicked --> K[Build Outcome]
+    J -- no click --> J2[Slack: escalated request, 1 hour]
+    J2 --> K
     I -- no --> K
     K --> N{Auto or approved?}
     N -- yes --> O[Create Jira Issue]
@@ -58,6 +64,7 @@ All files are in `workflows/`. They are n8n workflow JSON and can be imported wi
 | `06_sop_knowledge_base_load.json` | SOP Knowledge Base - Load into Pinecone | Embeds 10 SOPs into Pinecone |
 | `07_ticket_classifier_eval.json` | Ticket Classifier - Eval (20 tickets) | Scores the classifier on 20 labelled tickets |
 | `08_sop_retrieval_eval.json` | SOP Retrieval - Eval (9 tickets) | Checks the right SOP (or none) comes back |
+| `09_webhook_auth_check.json` | Webhook Auth Check | Calls the webhook without the secret (expects 403) and with it (expects 400 for an empty ticket) |
 
 The files hold credential names and ids only. No keys or passwords are stored in workflows; they live in the n8n credential store.
 
@@ -108,7 +115,8 @@ The files hold credential names and ids only. No keys or passwords are stored in
 | Model or database call fails | Retries: 2 or 3 tries with a wait between them |
 | Slack is down | Outcome message is set to continue on error, so the ticket still completes |
 | Jira is down | 3 tries, then continue. Slack says the issue was not created and `jira_key` stays empty |
-| Nobody answers the approval | Wait ends after 1 hour, outcome is saved as `timed_out` |
+| Nobody answers the approval | After 1 hour a second, escalated request is posted. After 1 more hour the outcome is saved as `timed_out` with `escalated = true`, and no Jira issue is created |
+| Unknown callers | The webhook requires a secret header (n8n Header Auth credential). Calls without it get 403 before the workflow runs |
 | Model returns a bad value | Code validation replaces it with a safe default and forces human review |
 | Ticket text tries to instruct the model | Prompts treat ticket text as data. Covered by an eval case |
 | Sender waits on a human | The reply to the sender is sent right after classification, before the RAG step and the Slack approval. An earlier version replied after the approval, so the sender timed out at 60 seconds and resent (caught by the duplicate check) |
@@ -148,15 +156,17 @@ Run the evals after every prompt, SOP, threshold or model change.
 | Supabase Postgres | Dedupe and logs | Postgres, session pooler host, port 5432 |
 | Slack | Alerts and approvals | Slack OAuth2 |
 | Jira Software Cloud | Issue creation in project IT Support | Email plus API token |
+| Gmail | P1 alert email | Gmail OAuth2 |
+| Webhook callers | Secret header on the intake webhook | Header Auth |
 
 ## Set up in a new n8n
 
 1. Run `db/schema.sql` in a Postgres database.
 2. Create a Pinecone index: 512 dimensions, cosine.
-3. In n8n, add credentials for Postgres, Slack, Jira, Pinecone, Anthropic and OpenAI.
+3. In n8n, add credentials for Postgres, Slack, Jira, Gmail, Pinecone, Anthropic and OpenAI, plus a Header Auth credential for the webhook secret.
 4. Import the files in `workflows/` in this order: 02, 03, 04, then 01, then the rest.
 5. In 01, 07 and 08, re-point the "Execute Sub-workflow" nodes to the imported 02 and 03 (workflow ids change on import). In 01, set the error workflow to 04.
-6. Pick your Slack channel in the Slack nodes, and your Jira project and issue type in the Jira node.
+6. Pick your Slack channel in the Slack nodes, your Jira project and issue type in the Jira node, and the alert address in the Gmail node. Set your own n8n host in the HTTP nodes of 05 and 09.
 7. Run 06 once to load the SOPs. Run 07 and 08 and check the scores.
 8. Publish 02, 03, 04, then 01.
 
@@ -172,7 +182,8 @@ Run the evals after every prompt, SOP, threshold or model change.
 | "Node does not have any credentials set" | Credential not attached to the node | Open the node and pick the credential |
 | Slack: "channel_not_found" | Channel missing or app not in it | Create the channel, or invite the n8n app to it |
 | Reply says "duplicate" | Same ticket was already processed | Expected. Change the ticket text or send a new `event_id` |
-| Approval buttons do nothing | The 1 hour wait has ended | Send the ticket again |
+| Approval buttons do nothing | The wait has ended | Use the newer escalated card, or send the ticket again |
+| Webhook returns 403 "Authorization data is wrong!" | Missing or wrong secret header | Use the same Header Auth credential on the caller. Run 09 to check |
 | Suggested fix says "No matching SOP" for a known problem | Score under the gate, or SOPs not loaded | Run 08 to see scores. Rerun 06 |
 | No Slack alert on failure | Manual test runs do not fire the error workflow | Test with a production run |
 | Cannot set the error workflow | The error workflow is not published | Publish it first |
@@ -193,7 +204,8 @@ Where to look first: n8n **Executions** list, open the failed run, click the red
 
 ## Known limits
 
-- The webhook and the demo form have no authentication. Before real use, add header auth or a signed secret.
+- The webhook requires a secret header, but the demo form page itself is public. Unpublish the form when it is not in use.
+- The P1 alert goes to one fixed email address. A real setup would use an on-call tool or a distribution list.
 - "Ignore SSL Issues" is on for the Postgres credential. For real use, add the Supabase CA certificate.
 - Jira issues are created but not updated later. There is no sync back from Jira when an issue is resolved.
 - A crash between creating the Jira issue and saving the outcome could create a second issue when the ticket is retried after 15 minutes.

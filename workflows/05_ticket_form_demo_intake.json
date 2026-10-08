@@ -65,7 +65,7 @@
       "parameters": {
         "method": "POST",
         "url": "https://YOUR-N8N-HOST/webhook/ticket-triage",
-        "authentication": "none",
+        "authentication": "genericCredentialType",
         "sendBody": true,
         "contentType": "json",
         "specifyBody": "json",
@@ -77,11 +77,18 @@
               "neverError": true
             }
           }
-        }
+        },
+        "genericAuthType": "httpHeaderAuth"
       },
       "retryOnFail": true,
       "maxTries": 2,
-      "waitBetweenTries": 3000
+      "waitBetweenTries": 3000,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "5oGXCorFzJlmqrX0",
+          "name": "Header Auth account"
+        }
+      }
     }
   ],
   "connections": {

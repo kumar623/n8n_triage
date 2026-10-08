@@ -1,0 +1,167 @@
+{
+  "name": "Webhook Auth Check",
+  "nodes": [
+    {
+      "name": "Run Auth Check",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {}
+    },
+    {
+      "name": "Call Without Secret",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR-N8N-HOST/webhook/ticket-triage",
+        "authentication": "none",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "{ \"from\": \"auth-check@example.com\", \"subject\": \"\", \"body\": \"\" }",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Call With Secret",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR-N8N-HOST/webhook/ticket-triage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "{ \"from\": \"auth-check@example.com\", \"subject\": \"\", \"body\": \"\" }",
+        "options": {
+          "timeout": 20000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "5oGXCorFzJlmqrX0",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "name": "Summarize Check",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "chk-no",
+              "name": "without_secret_status",
+              "value": "={{ $(\"Call Without Secret\").first().json.statusCode }}",
+              "type": "number"
+            },
+            {
+              "id": "chk-yes",
+              "name": "with_secret_status",
+              "value": "={{ $(\"Call With Secret\").first().json.statusCode }}",
+              "type": "number"
+            },
+            {
+              "id": "chk-pass",
+              "name": "check_passed",
+              "value": "={{ $(\"Call Without Secret\").first().json.statusCode === 403 && $(\"Call With Secret\").first().json.statusCode === 400 }}",
+              "type": "boolean"
+            },
+            {
+              "id": "chk-note",
+              "name": "expected",
+              "value": "Without the secret: 403 (blocked). With the secret and an empty ticket: 400 (let in, then rejected as empty, so no AI cost and no row saved).",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Run Auth Check": {
+      "main": [
+        [
+          {
+            "node": "Call Without Secret",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Without Secret": {
+      "main": [
+        [
+          {
+            "node": "Call With Secret",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call With Secret": {
+      "main": [
+        [
+          {
+            "node": "Summarize Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodeGroups": [
+    {
+      "name": "Auth check",
+      "nodeNames": [
+        "Call Without Secret",
+        "Call With Secret",
+        "Summarize Check"
+      ],
+      "description": "Calls the live webhook without and with the secret header and checks it is blocked, then let in."
+    }
+  ]
+}

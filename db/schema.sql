@@ -22,6 +22,7 @@ create table if not exists public.ticket_log (
   suggested_fix text,
   sop_source text,
   jira_key text,
+  escalated boolean not null default false,
   received_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
