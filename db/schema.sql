@@ -21,6 +21,7 @@ create table if not exists public.ticket_log (
   servicenow_number text,
   suggested_fix text,
   sop_source text,
+  jira_key text,
   received_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

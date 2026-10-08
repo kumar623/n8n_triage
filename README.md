@@ -1,6 +1,6 @@
 # IT Ticket Triage Agent (n8n)
 
-A low-code agent that reads an IT support ticket, classifies it with Claude, checks for duplicates, suggests a fix from a knowledge base of SOPs (RAG), asks a human to approve anything risky, and logs every step.
+A low-code agent that reads an IT support ticket, classifies it with Claude, checks for duplicates, suggests a fix from a knowledge base of SOPs (RAG), asks a human to approve anything risky, creates a Jira issue, and logs every step.
 
 Status: working prototype, built as a personal project. It runs live on an n8n cloud trial. It is not a client production system.
 
@@ -13,8 +13,9 @@ Status: working prototype, built as a personal project. It runs live on an n8n c
 5. Code re-checks the model output. P1, security, low confidence, or bad output forces a human review.
 6. RAG: the ticket is matched against SOPs in Pinecone, and Claude writes a short fix using only the matching SOP.
 7. Tickets that need a human wait in Slack for Approve or Decline (1 hour limit).
-8. The outcome is posted to Slack and saved in Postgres.
-9. If the workflow fails, a separate error workflow alerts Slack.
+8. Auto-triaged and approved tickets create a Jira issue with the priority, triage details and suggested fix. Declined and timed-out tickets create nothing.
+9. The outcome, with the Jira link, is posted to Slack and saved in Postgres.
+10. If the workflow fails, a separate error workflow alerts Slack.
 
 ## Diagram
 
@@ -35,7 +36,10 @@ flowchart LR
     I -- yes --> J[Slack: Approve or Decline]
     J --> K[Build Outcome]
     I -- no --> K
-    K --> L[Slack: outcome message]
+    K --> N{Auto or approved?}
+    N -- yes --> O[Create Jira Issue]
+    O --> L[Slack: outcome message]
+    N -- no --> L
     L --> M[(Save Outcome)]
     X[Any failure] -.-> Y[Error workflow: Slack alert]
 ```
@@ -103,6 +107,7 @@ The files hold credential names and ids only. No keys or passwords are stored in
 | Run crashes after claiming a ticket | A row stuck in `processing` for 15 minutes can be claimed again |
 | Model or database call fails | Retries: 2 or 3 tries with a wait between them |
 | Slack is down | Outcome message is set to continue on error, so the ticket still completes |
+| Jira is down | 3 tries, then continue. Slack says the issue was not created and `jira_key` stays empty |
 | Nobody answers the approval | Wait ends after 1 hour, outcome is saved as `timed_out` |
 | Model returns a bad value | Code validation replaces it with a safe default and forces human review |
 | Ticket text tries to instruct the model | Prompts treat ticket text as data. Covered by an eval case |
@@ -142,15 +147,16 @@ Run the evals after every prompt, SOP, threshold or model change.
 | Pinecone | Index `ticket-sops` (512 dimensions, cosine), namespace `sops` | Pinecone API key |
 | Supabase Postgres | Dedupe and logs | Postgres, session pooler host, port 5432 |
 | Slack | Alerts and approvals | Slack OAuth2 |
+| Jira Software Cloud | Issue creation in project IT Support | Email plus API token |
 
 ## Set up in a new n8n
 
 1. Run `db/schema.sql` in a Postgres database.
 2. Create a Pinecone index: 512 dimensions, cosine.
-3. In n8n, add credentials for Postgres, Slack, Pinecone, Anthropic and OpenAI.
+3. In n8n, add credentials for Postgres, Slack, Jira, Pinecone, Anthropic and OpenAI.
 4. Import the files in `workflows/` in this order: 02, 03, 04, then 01, then the rest.
 5. In 01, 07 and 08, re-point the "Execute Sub-workflow" nodes to the imported 02 and 03 (workflow ids change on import). In 01, set the error workflow to 04.
-6. Pick your Slack channel in the Slack nodes.
+6. Pick your Slack channel in the Slack nodes, and your Jira project and issue type in the Jira node.
 7. Run 06 once to load the SOPs. Run 07 and 08 and check the scores.
 8. Publish 02, 03, 04, then 01.
 
@@ -189,7 +195,8 @@ Where to look first: n8n **Executions** list, open the failed run, click the red
 
 - The webhook and the demo form have no authentication. Before real use, add header auth or a signed secret.
 - "Ignore SSL Issues" is on for the Postgres credential. For real use, add the Supabase CA certificate.
-- No ticketing system is connected yet. ServiceNow was planned and left out.
+- Jira issues are created but not updated later. There is no sync back from Jira when an issue is resolved.
+- A crash between creating the Jira issue and saving the outcome could create a second issue when the ticket is retried after 15 minutes.
 - The approval step does not record who clicked.
 - The knowledge base is 10 short SOPs written for this project.
 - Tested with a few dozen tickets, not at volume. Rate limits were not reached.

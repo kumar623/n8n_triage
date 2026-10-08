@@ -126,7 +126,7 @@
           "mode": "id",
           "value": "C0C7H08CC1Z"
         },
-        "text": "={{ ({ auto: \":white_check_mark: AUTO-TRIAGED\", approved: \":white_check_mark: APPROVED BY HUMAN\", rejected: \":no_entry: DECLINED BY HUMAN\", timed_out: \":hourglass: NO DECISION IN TIME\" })[$json.decision] ?? $json.decision }} | *{{ $json.priority }}* | *{{ $json.category }}*\n*Subject:* {{ $json.subject }}\n*From:* {{ $json.from }}\n*System:* {{ $json.affected_system }}\n*Summary:* {{ $json.summary }}\n*Confidence:* {{ $json.confidence }}\n*Next step:* {{ ({ auto: \"sent to the support queue, no approval needed\", approved: \"sent to the support queue\", rejected: \"closed, no action taken\", timed_out: \"needs escalation, nobody answered within 1 hour\" })[$json.decision] ?? \"review manually\" }}\n*Suggested fix*{{ $json.sop_source ? \" (from \" + $json.sop_source + \")\" : \"\" }}:\n{{ $json.suggested_fix }}",
+        "text": "={{ ({ auto: \":white_check_mark: AUTO-TRIAGED\", approved: \":white_check_mark: APPROVED BY HUMAN\", rejected: \":no_entry: DECLINED BY HUMAN\", timed_out: \":hourglass: NO DECISION IN TIME\" })[$('Build Outcome').first().json.decision] ?? $('Build Outcome').first().json.decision }} | *{{ $('Build Outcome').first().json.priority }}* | *{{ $('Build Outcome').first().json.category }}*\n*Subject:* {{ $('Build Outcome').first().json.subject }}\n*From:* {{ $('Build Outcome').first().json.from }}\n*System:* {{ $('Build Outcome').first().json.affected_system }}\n*Summary:* {{ $('Build Outcome').first().json.summary }}\n*Confidence:* {{ $('Build Outcome').first().json.confidence }}\n*Jira:* {{ ($('Create Jira Issue').isExecuted && $('Create Jira Issue').first().json.key) ? \"<\" + $('Create Jira Issue').first().json.self.split(\"/rest/\")[0] + \"/browse/\" + $('Create Jira Issue').first().json.key + \"|\" + $('Create Jira Issue').first().json.key + \">\" : (({ rejected: \"not created (declined)\", timed_out: \"not created (nobody answered within 1 hour, needs escalation)\" })[$('Build Outcome').first().json.decision] ?? \"not created (Jira step failed, check the execution)\") }}\n*Suggested fix*{{ $('Build Outcome').first().json.sop_source ? \" (from \" + $('Build Outcome').first().json.sop_source + \")\" : \"\" }}:\n{{ $('Build Outcome').first().json.suggested_fix }}",
         "otherOptions": {
           "includeLinkToWorkflow": false,
           "mrkdwn": true
@@ -137,7 +137,7 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.7,
       "position": [
-        3136,
+        3584,
         304
       ],
       "webhookId": "5c2779ca-52d2-44c6-bf88-f4e653c23018",
@@ -570,10 +570,10 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE ticket_log\nSET status = CASE $2::text WHEN 'rejected' THEN 'rejected' WHEN 'timed_out' THEN 'timed_out' ELSE 'done' END,\n    decision = $2::text, suggested_fix = $3::text, sop_source = NULLIF($4::text, ''), updated_at = now()\nWHERE id = $1::uuid\nRETURNING id, status, decision;",
+        "query": "UPDATE ticket_log\nSET status = CASE $2::text WHEN 'rejected' THEN 'rejected' WHEN 'timed_out' THEN 'timed_out' ELSE 'done' END,\n    decision = $2::text, suggested_fix = $3::text, sop_source = NULLIF($4::text, ''), jira_key = NULLIF($5::text, ''), updated_at = now()\nWHERE id = $1::uuid\nRETURNING id, status, decision, jira_key;",
         "options": {
           "connectionTimeout": 15,
-          "queryReplacement": "={{ [$('Build Outcome').first().json.ticket_id, $('Build Outcome').first().json.decision, $('Build Outcome').first().json.suggested_fix, $('Build Outcome').first().json.sop_source] }}"
+          "queryReplacement": "={{ [$('Build Outcome').first().json.ticket_id, $('Build Outcome').first().json.decision, $('Build Outcome').first().json.suggested_fix, $('Build Outcome').first().json.sop_source, ($('Create Jira Issue').isExecuted ? ($('Create Jira Issue').first().json.key ?? '') : '')] }}"
         }
       },
       "id": "8bcd72d6-5194-4e68-b537-658e4562e558",
@@ -581,7 +581,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        3360,
+        3808,
         304
       ],
       "retryOnFail": true,
@@ -657,6 +657,95 @@
       "notes": "RAG. Calls 'Suggest Fix from SOPs (shared)': Pinecone search, then Claude writes a fix using only the SOP text. If this step fails, the ticket still completes.",
       "onError": "continueRegularOutput",
       "alwaysOutputData": true
+    },
+    {
+      "id": "a1f0c7d2-5b1e-4c3a-9e2f-7d6b8c9a0e11",
+      "name": "Should Create Issue?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3136,
+        304
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "decision-auto",
+              "leftValue": "={{ $json.decision }}",
+              "rightValue": "auto",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "decision-approved",
+              "leftValue": "={{ $json.decision }}",
+              "rightValue": "approved",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b2e1d8e3-6c2f-4d4b-8f30-8e7c9dab1f22",
+      "name": "Create Jira Issue",
+      "type": "n8n-nodes-base.jira",
+      "typeVersion": 1,
+      "position": [
+        3360,
+        144
+      ],
+      "parameters": {
+        "resource": "issue",
+        "operation": "create",
+        "jiraVersion": "cloud",
+        "project": {
+          "__rl": true,
+          "mode": "id",
+          "value": "10002",
+          "cachedResultName": "IT Support"
+        },
+        "issueType": {
+          "__rl": true,
+          "mode": "id",
+          "value": "10012",
+          "cachedResultName": "Task"
+        },
+        "summary": "=[{{ $('Build Outcome').first().json.priority }}] {{ $('Build Outcome').first().json.subject }}",
+        "additionalFields": {
+          "description": "=Reported by: {{ $('Build Outcome').first().json.from }}\n\n{{ $('Build Ticket Record').first().json.body }}\n\n--- AI triage ---\nCategory: {{ $('Build Outcome').first().json.category }}\nPriority: {{ $('Build Outcome').first().json.priority }}\nAffected system: {{ $('Build Outcome').first().json.affected_system }}\nSummary: {{ $('Build Outcome').first().json.summary }}\nConfidence: {{ $('Build Outcome').first().json.confidence }}\nDecision: {{ $('Build Outcome').first().json.decision }}\n\n--- Suggested fix {{ $('Build Outcome').first().json.sop_source ? '(from ' + $('Build Outcome').first().json.sop_source + ')' : '' }} ---\n{{ $('Build Outcome').first().json.suggested_fix }}\n\nTriage reference: {{ $('Build Ticket Record').first().json.dedupe_key }}",
+          "priority": {
+            "__rl": true,
+            "mode": "id",
+            "value": "={{ ({ P1: '1', P2: '2', P3: '3', P4: '4' })[$('Build Outcome').first().json.priority] ?? '3' }}"
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput",
+      "notes": "The agent takes an action in a business system. Runs only for auto-triaged or approved tickets. If Jira fails, the ticket still completes and Slack says the issue was not created.",
+      "credentials": {
+        "jiraSoftwareCloudApi": {
+          "id": "n6LJ7A8X3t4EYBap",
+          "name": "Jira SW Cloud account"
+        }
+      }
     }
   ],
   "connections": {
@@ -813,7 +902,7 @@
       "main": [
         [
           {
-            "node": "Notify Slack",
+            "node": "Should Create Issue?",
             "type": "main",
             "index": 0
           }
@@ -847,6 +936,35 @@
         [
           {
             "node": "Suggest Fix",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Create Issue?": {
+      "main": [
+        [
+          {
+            "node": "Create Jira Issue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Jira Issue": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack",
             "type": "main",
             "index": 0
           }
@@ -891,18 +1009,25 @@
       "description": "Calls the shared Claude classifier, saves the result, and replies to the sender right away."
     },
     {
-      "id": "c4a0750c-c9a4-41da-be89-57eaca81aeb2",
-      "name": "Suggested fix, approval and outcome",
+      "name": "Suggested fix and approval",
       "nodeNames": [
         "Suggest Fix",
         "Needs Human?",
         "Ask Approval in Slack",
         "Was Approved?",
-        "Build Outcome",
+        "Build Outcome"
+      ],
+      "description": "RAG suggests a fix from the SOPs. Sensitive tickets wait for Approve or Decline in Slack."
+    },
+    {
+      "name": "Action and log",
+      "nodeNames": [
+        "Should Create Issue?",
+        "Create Jira Issue",
         "Notify Slack",
         "Save Outcome"
       ],
-      "description": "RAG suggests a fix from the SOPs. Sensitive tickets wait for Approve or Decline in Slack. The outcome is posted and saved."
+      "description": "Auto-triaged and approved tickets create a Jira issue. The outcome is posted to Slack and saved."
     }
   ],
   "meta": {
