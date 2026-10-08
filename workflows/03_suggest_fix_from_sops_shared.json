@@ -93,7 +93,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const MIN_SCORE = 0.45;\nconst ticket = $(\"Receive Ticket Summary\").first().json;\n\nconst hits = $input.all()\n  .map(i => i.json)\n  .filter(h => h && h.document && typeof h.score === \"number\")\n  .sort((a, b) => b.score - a.score);\n\nconst round = n => Math.round(n * 1000) / 1000;\nconst good = hits.filter(h => h.score >= MIN_SCORE);\nconst found = good.length > 0;\n\nconst titles = {};\nconst scores = {};\nfor (const h of good) {\n  const meta = h.document.metadata || {};\n  const id = String(meta.sop_id || \"\");\n  if (!id) continue;\n  titles[id] = String(meta.title || \"\");\n  scores[id] = round(h.score);\n}\n\nreturn [{\n  json: {\n    sop_found: found,\n    sop_score: hits[0] ? round(hits[0].score) : 0,\n    sop_text: good.map(h => String(h.document.pageContent || \"\")).join(\"\\n\\n---\\n\\n\"),\n    sop_titles: titles,\n    sop_scores: scores,\n    subject: ticket.subject,\n    summary: ticket.summary,\n    candidates: hits.map(h => ({ sop_id: (h.document.metadata || {}).sop_id, score: round(h.score) }))\n  }\n}];"
+        "jsCode": "const MIN_SCORE = 0.35;\nconst ticket = $(\"Receive Ticket Summary\").first().json;\n\nconst hits = $input.all()\n  .map(i => i.json)\n  .filter(h => h && h.document && typeof h.score === \"number\")\n  .sort((a, b) => b.score - a.score);\n\nconst round = n => Math.round(n * 1000) / 1000;\nconst good = hits.filter(h => h.score >= MIN_SCORE);\nconst found = good.length > 0;\n\nconst titles = {};\nconst scores = {};\nfor (const h of good) {\n  const meta = h.document.metadata || {};\n  const id = String(meta.sop_id || \"\");\n  if (!id) continue;\n  titles[id] = String(meta.title || \"\");\n  scores[id] = round(h.score);\n}\n\nreturn [{\n  json: {\n    sop_found: found,\n    sop_score: hits[0] ? round(hits[0].score) : 0,\n    sop_text: good.map(h => String(h.document.pageContent || \"\")).join(\"\\n\\n---\\n\\n\"),\n    sop_titles: titles,\n    sop_scores: scores,\n    subject: ticket.subject,\n    summary: ticket.summary,\n    candidates: hits.map(h => ({ sop_id: (h.document.metadata || {}).sop_id, score: round(h.score) }))\n  }\n}];"
       }
     },
     {
@@ -334,7 +334,7 @@
         "OpenAI Embeddings",
         "Pick Best SOP"
       ],
-      "description": "Searches Pinecone for the 3 closest SOPs and keeps those with a score of 0.45 or higher."
+      "description": "Searches Pinecone for the 3 closest SOPs and keeps those with a score of 0.35 or higher."
     },
     {
       "id": "1098f231-f6d9-4b85-ada6-b8d8bdeeff2b",

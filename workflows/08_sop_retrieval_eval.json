@@ -1,5 +1,5 @@
 {
-  "name": "SOP Retrieval - Eval (8 tickets)",
+  "name": "SOP Retrieval - Eval (9 tickets)",
   "nodes": [
     {
       "id": "cfbf9071-ab26-49ed-99a4-1e641851c7e1",
@@ -24,7 +24,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "const cases = [\n  [\"R01\", \"Cannot log in to Salesforce after password reset\", \"User cannot log in to Salesforce after a password reset and has a client call in one hour.\", \"Salesforce\", \"SOP-001\"],\n  [\"R02\", \"Entire sales team locked out of CRM\", \"Thirty sales team members are unable to log into the CRM system since 9am.\", \"CRM\", \"SOP-003\"],\n  [\"R03\", \"Slow Wi-Fi in meeting room 3\", \"Video calls freeze in meeting room 3 while the wired connection works fine.\", \"Wi-Fi\", \"SOP-005\"],\n  [\"R04\", \"Clicked a suspicious link\", \"User clicked a link in a strange email and typed their password before noticing it may be phishing.\", \"email\", \"SOP-006\"],\n  [\"R05\", \"Lost work phone\", \"User left their work phone on a train. It has company email on it.\", \"mobile phone\", \"SOP-009\"],\n  [\"R06\", \"Printer on 2nd floor keeps jamming\", \"The 2nd floor printer jams on every other page.\", \"printer\", \"SOP-010\"],\n  [\"R07\", \"its broken\", \"User reports something is broken but gives no details.\", \"unknown\", \"NONE\"],\n  [\"R08\", \"Need a Photoshop licence\", \"User asks for an Adobe Photoshop licence for a design project.\", \"Adobe Photoshop\", \"NONE\"]\n];\n\nreturn cases.map(c => ({ json: { case_id: c[0], subject: c[1], summary: c[2], affected_system: c[3], expected_sop: c[4] } }));"
+        "jsCode": "const cases = [\n  [\"R01\", \"Cannot log in to Salesforce after password reset\", \"User cannot log in to Salesforce after a password reset and has a client call in one hour.\", \"Salesforce\", \"SOP-001\"],\n  [\"R02\", \"Entire sales team locked out of CRM\", \"Thirty sales team members are unable to log into the CRM system since 9am.\", \"CRM\", \"SOP-003\"],\n  [\"R03\", \"Slow Wi-Fi in meeting room 3\", \"Video calls freeze in meeting room 3 while the wired connection works fine.\", \"Wi-Fi\", \"SOP-005\"],\n  [\"R04\", \"Clicked a suspicious link\", \"User clicked a link in a strange email and typed their password before noticing it may be phishing.\", \"email\", \"SOP-006\"],\n  [\"R05\", \"Lost work phone\", \"User left their work phone on a train. It has company email on it.\", \"mobile phone\", \"SOP-009\"],\n  [\"R06\", \"Printer on 2nd floor keeps jamming\", \"The 2nd floor printer jams on every other page.\", \"printer\", \"SOP-010\"],\n  [\"R07\", \"its broken\", \"User reports something is broken but gives no details.\", \"unknown\", \"NONE\"],\n  [\"R08\", \"Need a Photoshop licence\", \"User asks for an Adobe Photoshop licence for a design project.\", \"Adobe Photoshop\", \"NONE\"],\n  [\"R09\", \"ERP returns error 500 for everyone\", \"The ERP system is returning error 500 for all users and the warehouse cannot ship orders.\", \"ERP\", \"SOP-003\"]\n];\n\nreturn cases.map(c => ({ json: { case_id: c[0], subject: c[1], summary: c[2], affected_system: c[3], expected_sop: c[4] } }));"
       }
     },
     {
@@ -152,7 +152,7 @@
         "Suggest Fix",
         "Score RAG Results"
       ],
-      "description": "Sends 8 tickets through the RAG sub-workflow and checks the right SOP (or no SOP) comes back."
+      "description": "Sends 9 tickets through the RAG sub-workflow and checks the right SOP (or no SOP) comes back."
     }
   ],
   "meta": {

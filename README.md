@@ -53,7 +53,7 @@ All files are in `workflows/`. They are n8n workflow JSON and can be imported wi
 | `05_ticket_form_demo_intake.json` | Ticket Form (demo intake) | Web form that posts to the webhook |
 | `06_sop_knowledge_base_load.json` | SOP Knowledge Base - Load into Pinecone | Embeds 10 SOPs into Pinecone |
 | `07_ticket_classifier_eval.json` | Ticket Classifier - Eval (20 tickets) | Scores the classifier on 20 labelled tickets |
-| `08_sop_retrieval_eval.json` | SOP Retrieval - Eval (8 tickets) | Checks the right SOP (or none) comes back |
+| `08_sop_retrieval_eval.json` | SOP Retrieval - Eval (9 tickets) | Checks the right SOP (or none) comes back |
 
 The files hold credential names and ids only. No keys or passwords are stored in workflows; they live in the n8n credential store.
 
@@ -90,7 +90,7 @@ The files hold credential names and ids only. No keys or passwords are stored in
 
 ## How the RAG step avoids made-up answers
 
-1. **Score gate:** only SOPs with a similarity score of 0.45 or higher are passed to the model. Below that, the answer is "No matching SOP".
+1. **Score gate:** only SOPs with a similarity score of 0.35 or higher are passed to the model. Below that, the answer is "No matching SOP".
 2. **Grounded prompt:** Claude may only use steps written in the SOP, and must answer `NO_MATCH` if none of the SOPs fit.
 3. **Source check in code:** Claude must name the SOP it used. Code checks that SOP was really one of the retrieved ones. If not, the answer is thrown away.
 4. **Fail-safe:** if Pinecone or the model call fails, the ticket still completes and the message says the lookup was not available.
@@ -121,12 +121,13 @@ The files hold credential names and ids only. No keys or passwords are stored in
 
 All five misses were on the safe side: no risky ticket skipped human review.
 
-**RAG retrieval**, 8 labelled tickets (6 with a matching SOP, 2 with none):
+**RAG retrieval**, 9 labelled tickets (7 with a matching SOP, 2 with none):
 
 | Version | Score | Note |
 |---|---|---|
-| First version: top hit only, gate 0.3 | 7 of 8 | "Whole team locked out" matched the single-user lockout SOP, so the model answered NO_MATCH |
-| Current: top 3 above gate 0.45, model names its source | 8 of 8 | |
+| 1: top hit only, gate 0.3 | 7 of 8 | "Whole team locked out" matched the single-user lockout SOP, so the model answered NO_MATCH |
+| 2: top 3 above gate 0.45, model names its source | 8 of 8 | A live P1 ticket (ERP error for everyone) then scored 0.379 and was cut by the gate. It was added to the eval as case R09 |
+| Current: same, gate 0.35 | 9 of 9 | The vague ticket scores 0.387, above the gate, and is still rejected by the grounded prompt |
 
 Run the evals after every prompt, SOP, threshold or model change.
 
