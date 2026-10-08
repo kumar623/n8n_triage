@@ -23,6 +23,9 @@ create table if not exists public.ticket_log (
   sop_source text,
   jira_key text,
   escalated boolean not null default false,
+  pii_masked integer not null default 0,
+  pii_types text,
+  injection_suspected boolean not null default false,
   received_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -49,7 +52,31 @@ create table if not exists public.eval_runs (
 comment on table public.eval_runs is
   'One row per run of the 20-ticket classifier eval, to compare prompt versions over time.';
 
+create table if not exists public.helpdesk_sessions (
+  session_id text primary key,
+  requester_email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+comment on table public.helpdesk_sessions is
+  'One row per helpdesk chat session. Holds the requester email outside the model, so tools can use it while the model only sees a masked tag.';
+
+-- Same shape n8n Postgres Chat Memory creates by itself. Created here so row level security is on from the start.
+create table if not exists public.helpdesk_chat_memory (
+  id serial primary key,
+  session_id varchar(255) not null,
+  message jsonb not null
+);
+
+comment on table public.helpdesk_chat_memory is
+  'Conversation memory for the helpdesk AI agent (n8n Postgres Chat Memory). Holds masked text only.';
+
+create index if not exists helpdesk_chat_memory_session_idx on public.helpdesk_chat_memory (session_id);
+
 -- n8n connects as the postgres role, which bypasses row level security.
 -- RLS is on with no policies, so the public API roles cannot read these tables.
 alter table public.ticket_log enable row level security;
 alter table public.eval_runs enable row level security;
+alter table public.helpdesk_sessions enable row level security;
+alter table public.helpdesk_chat_memory enable row level security;

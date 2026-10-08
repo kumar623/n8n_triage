@@ -119,7 +119,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        672,
+        896,
         512
       ]
     },
@@ -133,7 +133,7 @@
           "mode": "id",
           "value": "C0C7H08CC1Z"
         },
-        "text": "={{ ({ auto: \":white_check_mark: AUTO-TRIAGED\", approved: \":white_check_mark: APPROVED BY HUMAN\", rejected: \":no_entry: DECLINED BY HUMAN\", timed_out: \":hourglass: NO DECISION, EVEN AFTER ESCALATION\" })[$('Build Outcome').first().json.decision] ?? $('Build Outcome').first().json.decision }}{{ ($('Build Outcome').first().json.escalated && $('Build Outcome').first().json.decision !== \"timed_out\") ? \" (after escalation)\" : \"\" }} | *{{ $('Build Outcome').first().json.priority }}* | *{{ $('Build Outcome').first().json.category }}*\n*Subject:* {{ $('Build Outcome').first().json.subject }}\n*From:* {{ $('Build Outcome').first().json.from }}\n*System:* {{ $('Build Outcome').first().json.affected_system }}\n*Summary:* {{ $('Build Outcome').first().json.summary }}\n*Confidence:* {{ $('Build Outcome').first().json.confidence }}\n*Jira:* {{ ($('Create Jira Issue').isExecuted && $('Create Jira Issue').first().json.key) ? \"<\" + $('Create Jira Issue').first().json.self.split(\"/rest/\")[0] + \"/browse/\" + $('Create Jira Issue').first().json.key + \"|\" + $('Create Jira Issue').first().json.key + \">\" : (({ rejected: \"not created (declined)\", timed_out: \"not created (nobody answered, needs manual follow-up)\" })[$('Build Outcome').first().json.decision] ?? \"not created (Jira step failed, check the execution)\") }}\n*Suggested fix*{{ $('Build Outcome').first().json.sop_source ? \" (from \" + $('Build Outcome').first().json.sop_source + \")\" : \"\" }}:\n{{ $('Build Outcome').first().json.suggested_fix }}",
+        "text": "={{ ({ auto: \":white_check_mark: AUTO-TRIAGED\", approved: \":white_check_mark: APPROVED BY HUMAN\", rejected: \":no_entry: DECLINED BY HUMAN\", timed_out: \":hourglass: NO DECISION, EVEN AFTER ESCALATION\" })[$('Build Outcome').first().json.decision] ?? $('Build Outcome').first().json.decision }}{{ ($('Build Outcome').first().json.escalated && $('Build Outcome').first().json.decision !== \"timed_out\") ? \" (after escalation)\" : \"\" }} | *{{ $('Build Outcome').first().json.priority }}* | *{{ $('Build Outcome').first().json.category }}*\n*Subject:* {{ $('Build Outcome').first().json.subject }}\n*From:* {{ $('Build Outcome').first().json.from }}\n*System:* {{ $('Build Outcome').first().json.affected_system }}\n*Summary:* {{ $('Build Outcome').first().json.summary }}\n*Confidence:* {{ $('Build Outcome').first().json.confidence }}\n*Jira:* {{ ($('Create Jira Issue').isExecuted && $('Create Jira Issue').first().json.key) ? \"<\" + $('Create Jira Issue').first().json.self.split(\"/rest/\")[0] + \"/browse/\" + $('Create Jira Issue').first().json.key + \"|\" + $('Create Jira Issue').first().json.key + \">\" : (({ rejected: \"not created (declined)\", timed_out: \"not created (nobody answered, needs manual follow-up)\" })[$('Build Outcome').first().json.decision] ?? \"not created (Jira step failed, check the execution)\") }}{{ $('Build Ticket Record').first().json.pii_masked > 0 ? \"\\n*Masked before AI:* \" + $('Build Ticket Record').first().json.pii_masked + \" sensitive value(s) (\" + $('Build Ticket Record').first().json.pii_types + \")\" : \"\" }}\n*Suggested fix*{{ $('Build Outcome').first().json.sop_source ? \" (from \" + $('Build Outcome').first().json.sop_source + \")\" : \"\" }}:\n{{ $('Build Outcome').first().json.suggested_fix }}",
         "otherOptions": {
           "includeLinkToWorkflow": false,
           "mrkdwn": true
@@ -144,7 +144,7 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.7,
       "position": [
-        4480,
+        4704,
         304
       ],
       "webhookId": "5c2779ca-52d2-44c6-bf88-f4e653c23018",
@@ -172,7 +172,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        1792,
+        2016,
         304
       ]
     },
@@ -182,7 +182,7 @@
         "query": "INSERT INTO ticket_log (dedupe_key, from_email, subject, body, status, received_at)\nVALUES ($1::text, $2::text, $3::text, $4::text, 'processing', $5::timestamptz)\nON CONFLICT (dedupe_key) DO UPDATE\n  SET status = 'processing', attempts = ticket_log.attempts + 1, updated_at = now()\n  WHERE ticket_log.status = 'processing' AND ticket_log.updated_at < now() - interval '15 minutes'\nRETURNING id, attempts;",
         "options": {
           "connectionTimeout": 15,
-          "queryReplacement": "={{ [$json.dedupe_key, $json.from, $json.subject, $json.body, $json.received_at] }}"
+          "queryReplacement": "={{ [$('Normalize Ticket').first().json.dedupe_key, $('Normalize Ticket').first().json.from, $('Guard Ticket Text').first().json.safe_subject, $('Guard Ticket Text').first().json.safe_body, $('Normalize Ticket').first().json.received_at] }}"
         }
       },
       "id": "4f44bcde-d59b-4cfd-9dde-592bdd2bb809",
@@ -190,7 +190,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        672,
+        896,
         304
       ],
       "retryOnFail": true,
@@ -235,7 +235,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        896,
+        1120,
         304
       ]
     },
@@ -252,7 +252,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        1120,
+        1344,
         528
       ]
     },
@@ -297,9 +297,9 @@
             }
           ],
           "value": {
-            "body": "={{ $('Normalize Ticket').first().json.body }}",
-            "from": "={{ $('Normalize Ticket').first().json.from }}",
-            "subject": "={{ $('Normalize Ticket').first().json.subject }}"
+            "body": "={{ $('Guard Ticket Text').first().json.safe_body }}",
+            "from": "={{ $('Guard Ticket Text').first().json.safe_from }}",
+            "subject": "={{ $('Guard Ticket Text').first().json.safe_subject }}"
           }
         },
         "options": {
@@ -311,7 +311,7 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.4,
       "position": [
-        1120,
+        1344,
         304
       ],
       "notes": "Calls the shared sub-workflow 'Ticket Classifier (shared)'. The eval workflow calls the same one."
@@ -337,6 +337,42 @@
               "name": "received_at",
               "type": "string",
               "value": "={{ $('Normalize Ticket').first().json.received_at }}"
+            },
+            {
+              "id": "rec-from",
+              "name": "from",
+              "type": "string",
+              "value": "={{ $('Normalize Ticket').first().json.from }}"
+            },
+            {
+              "id": "rec-needs-human",
+              "name": "needs_human",
+              "type": "boolean",
+              "value": "={{ $json.needs_human === true || $('Guard Ticket Text').first().json.injection_suspected === true }}"
+            },
+            {
+              "id": "rec-human-reasons",
+              "name": "human_reasons",
+              "type": "array",
+              "value": "={{ ($json.human_reasons ?? []).concat($('Guard Ticket Text').first().json.injection_suspected ? ['possible prompt injection (' + $('Guard Ticket Text').first().json.injection_signals.join(', ') + ')'] : []) }}"
+            },
+            {
+              "id": "rec-pii-masked",
+              "name": "pii_masked",
+              "type": "number",
+              "value": "={{ $('Guard Ticket Text').first().json.pii_count ?? 0 }}"
+            },
+            {
+              "id": "rec-pii-types",
+              "name": "pii_types",
+              "type": "string",
+              "value": "={{ ($('Guard Ticket Text').first().json.pii_types ?? []).join(', ') }}"
+            },
+            {
+              "id": "rec-injection",
+              "name": "injection_suspected",
+              "type": "boolean",
+              "value": "={{ $('Guard Ticket Text').first().json.injection_suspected === true }}"
             }
           ]
         },
@@ -348,17 +384,17 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.5,
       "position": [
-        1344,
+        1568,
         304
       ]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE ticket_log\nSET status = 'classified', category = $2::text, priority = $3::text, affected_system = $4::text, summary = $5::text,\n    confidence = $6::numeric, needs_human = $7::boolean, reasoning = $8::text, prompt_version = $9::text, updated_at = now()\nWHERE id = $1::uuid\nRETURNING id, status;",
+        "query": "UPDATE ticket_log\nSET status = 'classified', category = $2::text, priority = $3::text, affected_system = $4::text, summary = $5::text,\n    confidence = $6::numeric, needs_human = $7::boolean, reasoning = $8::text, prompt_version = $9::text,\n    pii_masked = $10::integer, pii_types = NULLIF($11::text, ''), injection_suspected = $12::boolean, updated_at = now()\nWHERE id = $1::uuid\nRETURNING id, status;",
         "options": {
           "connectionTimeout": 15,
-          "queryReplacement": "={{ [$json.ticket_id, $json.category, $json.priority, $json.affected_system, $json.summary, $json.confidence, $json.needs_human, $json.reasoning, $json.prompt_version] }}"
+          "queryReplacement": "={{ [$json.ticket_id, $json.category, $json.priority, $json.affected_system, $json.summary, $json.confidence, $json.needs_human, $json.reasoning, $json.prompt_version, $json.pii_masked, $json.pii_types, $json.injection_suspected] }}"
         }
       },
       "id": "c20ae70c-f896-4559-a607-c8213ced1ccb",
@@ -366,7 +402,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        1568,
+        1792,
         304
       ],
       "retryOnFail": true,
@@ -409,7 +445,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        2688,
+        2912,
         304
       ]
     },
@@ -424,7 +460,7 @@
           "mode": "id",
           "value": "C0C7H08CC1Z"
         },
-        "message": "={{ $('Build Ticket Record').first().json.priority === 'P1' ? '<!channel> ' : '' }}:rotating_light: *Approval needed* | *{{ $('Build Ticket Record').first().json.priority }}* | *{{ $('Build Ticket Record').first().json.category }}*\n*Subject:* {{ $('Build Ticket Record').first().json.subject }}\n*From:* {{ $('Build Ticket Record').first().json.from }}\n*System:* {{ $('Build Ticket Record').first().json.affected_system }}\n*Summary:* {{ $('Build Ticket Record').first().json.summary }}\n*Confidence:* {{ $('Build Ticket Record').first().json.confidence }}\n*Review because:* {{ $('Build Ticket Record').first().json.human_reasons.join(\", \") }}\n*Suggested fix*{{ $('Suggest Fix').first().json.sop_source ? \" (from \" + $('Suggest Fix').first().json.sop_source + \")\" : \"\" }}:\n{{ $('Suggest Fix').first().json.suggested_fix ?? \"Not available (knowledge base lookup failed).\" }}\n\nApprove = accept this triage and create a Jira issue. Decline = close with no action.",
+        "message": "={{ $('Build Ticket Record').first().json.priority === 'P1' ? '<!channel> ' : '' }}:rotating_light: *Approval needed* | *{{ $('Build Ticket Record').first().json.priority }}* | *{{ $('Build Ticket Record').first().json.category }}*\n*Subject:* {{ $('Build Ticket Record').first().json.subject }}\n*From:* {{ $('Build Ticket Record').first().json.from }}\n*System:* {{ $('Build Ticket Record').first().json.affected_system }}\n*Summary:* {{ $('Build Ticket Record').first().json.summary }}\n*Confidence:* {{ $('Build Ticket Record').first().json.confidence }}\n*Review because:* {{ $('Build Ticket Record').first().json.human_reasons.join(\", \") }}{{ $('Build Ticket Record').first().json.pii_masked > 0 ? \"\\n*Masked before AI:* \" + $('Build Ticket Record').first().json.pii_masked + \" sensitive value(s) (\" + $('Build Ticket Record').first().json.pii_types + \")\" : \"\" }}\n*Suggested fix*{{ $('Suggest Fix').first().json.sop_source ? \" (from \" + $('Suggest Fix').first().json.sop_source + \")\" : \"\" }}:\n{{ $('Suggest Fix').first().json.suggested_fix ?? \"Not available (knowledge base lookup failed).\" }}\n\nApprove = accept this triage and create a Jira issue. Decline = close with no action.",
         "approvalOptions": {
           "values": {
             "approvalType": "double"
@@ -446,7 +482,7 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.7,
       "position": [
-        2912,
+        3136,
         144
       ],
       "retryOnFail": true,
@@ -491,7 +527,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3584,
+        3808,
         144
       ]
     },
@@ -580,7 +616,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.5,
       "position": [
-        3808,
+        4032,
         304
       ]
     },
@@ -598,7 +634,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        4704,
+        4928,
         304
       ],
       "retryOnFail": true,
@@ -617,7 +653,7 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.4,
       "position": [
-        2016,
+        2240,
         304
       ],
       "parameters": {
@@ -681,7 +717,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        4032,
+        4256,
         304
       ],
       "parameters": {
@@ -723,7 +759,7 @@
       "type": "n8n-nodes-base.jira",
       "typeVersion": 1,
       "position": [
-        4256,
+        4480,
         144
       ],
       "parameters": {
@@ -744,7 +780,7 @@
         },
         "summary": "=[{{ $('Build Outcome').first().json.priority }}] {{ $('Build Outcome').first().json.subject }}",
         "additionalFields": {
-          "description": "=Reported by: {{ $('Build Outcome').first().json.from }}\n\n{{ $('Build Ticket Record').first().json.body }}\n\n--- AI triage ---\nCategory: {{ $('Build Outcome').first().json.category }}\nPriority: {{ $('Build Outcome').first().json.priority }}\nAffected system: {{ $('Build Outcome').first().json.affected_system }}\nSummary: {{ $('Build Outcome').first().json.summary }}\nConfidence: {{ $('Build Outcome').first().json.confidence }}\nDecision: {{ $('Build Outcome').first().json.decision }}\n\n--- Suggested fix {{ $('Build Outcome').first().json.sop_source ? '(from ' + $('Build Outcome').first().json.sop_source + ')' : '' }} ---\n{{ $('Build Outcome').first().json.suggested_fix }}\n\nTriage reference: {{ $('Build Ticket Record').first().json.dedupe_key }}",
+          "description": "=Reported by: {{ $('Build Outcome').first().json.from }}\n\n{{ $('Build Ticket Record').first().json.body }}{{ $('Build Ticket Record').first().json.pii_masked > 0 ? '\\n\\nNote: ' + $('Build Ticket Record').first().json.pii_masked + ' sensitive value(s) were replaced with tags by the triage guard (' + $('Build Ticket Record').first().json.pii_types + ').' : '' }}\n\n--- AI triage ---\nCategory: {{ $('Build Outcome').first().json.category }}\nPriority: {{ $('Build Outcome').first().json.priority }}\nAffected system: {{ $('Build Outcome').first().json.affected_system }}\nSummary: {{ $('Build Outcome').first().json.summary }}\nConfidence: {{ $('Build Outcome').first().json.confidence }}\nDecision: {{ $('Build Outcome').first().json.decision }}\n\n--- Suggested fix {{ $('Build Outcome').first().json.sop_source ? '(from ' + $('Build Outcome').first().json.sop_source + ')' : '' }} ---\n{{ $('Build Outcome').first().json.suggested_fix }}\n\nTriage reference: {{ $('Build Ticket Record').first().json.dedupe_key }}",
           "priority": {
             "__rl": true,
             "mode": "id",
@@ -770,7 +806,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        3136,
+        3360,
         144
       ],
       "parameters": {
@@ -804,7 +840,7 @@
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.7,
       "position": [
-        3360,
+        3584,
         0
       ],
       "parameters": {
@@ -855,7 +891,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        2240,
+        2464,
         304
       ],
       "parameters": {
@@ -888,8 +924,8 @@
       "type": "n8n-nodes-base.gmail",
       "typeVersion": 2.2,
       "position": [
-        2464,
-        464
+        2624,
+        672
       ],
       "parameters": {
         "resource": "message",
@@ -921,8 +957,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
       "position": [
-        2464,
-        640
+        2816,
+        672
       ],
       "parameters": {
         "method": "POST",
@@ -944,6 +980,65 @@
         "httpBearerAuth": {
           "id": "7FdFQOWUPxwvJmKy",
           "name": "Vapi API key"
+        }
+      }
+    },
+    {
+      "name": "Guard Ticket Text",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        672,
+        304
+      ],
+      "notes": "Safety step. Calls 'Ticket Guard (shared)': masks PII and secrets and flags prompt injection. Everything after this node, including the model and the log, sees only masked text. If this step fails the run stops (fail closed).",
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "Rqu8yFvtenrXyeuS"
+        },
+        "workflowInputs": {
+          "attemptToConvertTypes": false,
+          "mappingMode": "defineBelow",
+          "matchingColumns": [],
+          "schema": [
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "from",
+              "id": "from",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "subject",
+              "id": "subject",
+              "required": false,
+              "type": "string"
+            },
+            {
+              "canBeUsedToMatch": true,
+              "defaultMatch": false,
+              "display": true,
+              "displayName": "body",
+              "id": "body",
+              "required": false,
+              "type": "string"
+            }
+          ],
+          "value": {
+            "from": "={{ $('Normalize Ticket').first().json.from }}",
+            "subject": "={{ $('Normalize Ticket').first().json.subject }}",
+            "body": "={{ $('Normalize Ticket').first().json.body }}"
+          }
+        },
+        "options": {
+          "waitForSubWorkflow": true
         }
       }
     }
@@ -975,7 +1070,7 @@
       "main": [
         [
           {
-            "node": "Claim Ticket",
+            "node": "Guard Ticket Text",
             "type": "main",
             "index": 0
           }
@@ -1239,6 +1334,17 @@
           }
         ]
       ]
+    },
+    "Guard Ticket Text": {
+      "main": [
+        [
+          {
+            "node": "Claim Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -1248,15 +1354,6 @@
     "errorWorkflow": "3atti01oKFzqFAyP"
   },
   "nodeGroups": [
-    {
-      "id": "eccb8daa-32fa-4ed2-ba47-0816d59404a9",
-      "name": "Intake",
-      "nodeNames": [
-        "Normalize Ticket",
-        "Has Ticket Content?"
-      ],
-      "description": "Cleans the incoming ticket, builds a dedupe key, and stops empty tickets before any AI cost."
-    },
     {
       "id": "53cb1732-ebc8-4620-885e-a20f935b903e",
       "name": "Duplicate check",
@@ -1302,6 +1399,21 @@
         "Save Outcome"
       ],
       "description": "Auto-triaged and approved tickets create a Jira issue. The outcome is posted to Slack and saved."
+    },
+    {
+      "name": "Intake",
+      "nodeNames": [
+        "Normalize Ticket",
+        "Has Ticket Content?"
+      ],
+      "description": "Cleans the incoming ticket, builds a dedupe key, and stops empty tickets before any AI cost."
+    },
+    {
+      "name": "Safety guard",
+      "nodeNames": [
+        "Guard Ticket Text"
+      ],
+      "description": "Masks PII and secrets and flags prompt injection. Everything after this sees only masked text."
     }
   ],
   "meta": {
