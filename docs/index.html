@@ -37,6 +37,7 @@
   #signin h2 { margin: 0 0 8px; font-size: 1.125rem; }
   #signin p { margin: 0 0 16px; color: var(--muted); }
   #chat { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  #signin { margin: 16px 0; }
   #log { flex: 1; overflow-y: auto; padding: 16px 0; display: flex; flex-direction: column; gap: 10px; }
   .msg { max-width: 88%; padding: 10px 14px; border-radius: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
   .msg.user { align-self: flex-end; background: var(--user); }
@@ -48,6 +49,30 @@
   form { display: flex; gap: 8px; padding: 12px 0 4px; border-top: 1px solid var(--line); }
   input[type="text"] { flex: 1; min-width: 0; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
   footer { color: var(--muted); font-size: 0.8125rem; padding: 8px 0 0; }
+  .profile { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 0 4px; align-items: center; }
+  .tag { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font-size: 0.875rem; }
+  .tag b { font-weight: 600; }
+  .tag.role { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .profile .hint { color: var(--muted); font-size: 0.8125rem; flex-basis: 100%; }
+  .tabs { display: flex; gap: 4px; padding-top: 8px; border-bottom: 1px solid var(--line); }
+  .tab { background: none; border: 0; border-bottom: 3px solid transparent; padding: 8px 12px; cursor: pointer; color: var(--muted); font-weight: 600; }
+  .tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+  .tab:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+  #panel-chat { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  #panel-tickets { padding: 12px 0; }
+  .tickets-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-bottom: 8px; }
+  .tickets-head p { margin: 0; color: var(--muted); font-size: 0.875rem; }
+  .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.875rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td.nowrap { white-space: nowrap; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .empty { color: var(--muted); padding: 16px; font-size: 0.875rem; }
+  #signin table { margin-top: 4px; }
+  #signin h3 { font-size: 0.9375rem; margin: 24px 0 4px; }
+  #signin .small { font-size: 0.8125rem; margin: 0 0 8px; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -66,9 +91,31 @@
     <p>One chat for IT problems and HR questions. Your Google email is used to find your tickets and your HR record, so you never have to type it.</p>
     <button class="btn" id="google" type="button">Sign in with Google</button>
     <p id="signin-error" class="msg error" role="alert" hidden></p>
+
+    <h3>Demo accounts</h3>
+    <p class="small">Each Google account has a different HR record. What you can see depends on the role, and the role comes from the database, not from the chat.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th scope="col">Account</th><th scope="col">Role</th><th scope="col">Can see</th></tr></thead>
+        <tbody>
+          <tr><td class="nowrap">kri…23@gmail</td><td>India employee</td><td>India policies, own tickets</td></tr>
+          <tr><td class="nowrap">kri…la@gmail</td><td>India manager</td><td>India policies, manager guides, all tickets</td></tr>
+          <tr><td class="nowrap">kk9…83@gmail</td><td>UK employee</td><td>UK policies, own tickets</td></tr>
+          <tr><td class="nowrap">kth…57@gmail</td><td>UK manager</td><td>UK policies, manager guides, all tickets</td></tr>
+          <tr><td class="nowrap">kri…v2@gmail</td><td>UK contractor</td><td>Company-wide policies, own tickets</td></tr>
+          <tr><td class="nowrap">kth…60@gmail</td><td>India contractor</td><td>Company-wide policies, own tickets</td></tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <section id="chat" hidden>
+    <div class="profile" id="profile" aria-label="Your profile"></div>
+    <div class="tabs" role="tablist" aria-label="Views">
+      <button class="tab" id="tab-chat" role="tab" aria-selected="true" aria-controls="panel-chat" type="button">Chat</button>
+      <button class="tab" id="tab-tickets" role="tab" aria-selected="false" aria-controls="panel-tickets" type="button">Tickets</button>
+    </div>
+    <div id="panel-chat" role="tabpanel" aria-labelledby="tab-chat">
     <div id="log" role="log" aria-live="polite" aria-label="Conversation"></div>
     <div class="chips" id="chips">
       <button class="chip" type="button">How many days of annual leave do I get?</button>
@@ -81,6 +128,14 @@
       <input id="text" type="text" placeholder="Type your IT or HR question..." maxlength="2000" required>
       <button class="btn" id="send" type="submit">Send</button>
     </form>
+    </div>
+    <div id="panel-tickets" role="tabpanel" aria-labelledby="tab-tickets" hidden>
+      <div class="tickets-head">
+        <p id="tickets-note"></p>
+        <button class="link" id="refresh" type="button">Refresh</button>
+      </div>
+      <div class="scroll" id="tickets-box"></div>
+    </div>
   </section>
 
   <footer>Demo project. Login by Google through Supabase Auth. Every message is checked on the server before any AI runs.</footer>
@@ -93,6 +148,9 @@
   // Public settings. No secret lives in this page.
   var SUPABASE_URL = "https://cjcmdddvwrsutdxowglk.supabase.co";
   var CHAT_URL = "https://krishna31.app.n8n.cloud/webhook/helpdesk-secure-chat";
+  var DATA_URL = "https://krishna31.app.n8n.cloud/webhook/helpdesk-secure-data";
+  var COUNTRY = { IN: "India", UK: "United Kingdom" };
+  var ROLE = { employee: "Employee", manager: "Manager", contractor: "Contractor" };
   var PAGE_URL = window.location.origin + window.location.pathname;
   var STORE_KEY = "helpdesk-login";
 
@@ -162,6 +220,106 @@
       addMessage("bot", "Hi, I am the Employee Helpdesk. Ask me about an IT problem or ticket, or an HR question such as leave, pay day or policies.");
     }
     el("text").focus();
+    loadInfo();
+  }
+
+  function make(tag, text, className) {
+    var node = document.createElement(tag);
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    if (className) node.className = className;
+    return node;
+  }
+
+  function showTab(name) {
+    var chat = name === "chat";
+    el("tab-chat").setAttribute("aria-selected", chat ? "true" : "false");
+    el("tab-tickets").setAttribute("aria-selected", chat ? "false" : "true");
+    el("panel-chat").hidden = !chat;
+    el("panel-tickets").hidden = chat;
+  }
+
+  function renderProfile(info) {
+    var box = el("profile");
+    box.textContent = "";
+    var emp = info.employee;
+    if (!emp) {
+      box.appendChild(make("span", "No HR record", "tag role"));
+      box.appendChild(make("span", "No HR record was found for this email, so only company-wide policies apply and only your own tickets are shown.", "hint"));
+      return;
+    }
+    box.appendChild(make("span", ROLE[emp.role] || emp.role, "tag role"));
+    box.appendChild(make("span", COUNTRY[emp.country] || emp.country, "tag"));
+    if (emp.role !== "contractor") {
+      var leave = make("span", null, "tag");
+      leave.appendChild(make("b", emp.annual_leave_left));
+      leave.appendChild(document.createTextNode(" of " + emp.annual_leave_total + " leave days left"));
+      box.appendChild(leave);
+    }
+    var can = emp.role === "manager" ? "You can see manager guides and all tickets."
+      : emp.role === "contractor" ? "You can see company-wide policies and your own tickets."
+      : "You can see your country's policies and your own tickets.";
+    box.appendChild(make("span", "This comes from your HR record, found by your Google email. " + can, "hint"));
+  }
+
+  function renderTickets(info) {
+    var manager = info.is_manager === true;
+    var rows = info.tickets || [];
+    el("tab-tickets").textContent = (manager ? "All tickets" : "My tickets") + " (" + rows.length + ")";
+    el("tickets-note").textContent = manager
+      ? "Manager view: every ticket, with who raised it."
+      : "Only tickets raised with your email.";
+    var box = el("tickets-box");
+    box.textContent = "";
+    if (!rows.length) {
+      box.appendChild(make("p", "No tickets yet.", "empty"));
+      return;
+    }
+    var table = document.createElement("table");
+    var head = document.createElement("tr");
+    var columns = ["Ref"].concat(manager ? ["Raised by"] : [], ["Subject", "Priority", "Status", "Jira", "Created"]);
+    columns.forEach(function (name) {
+      var th = make("th", name);
+      th.scope = "col";
+      head.appendChild(th);
+    });
+    var thead = document.createElement("thead");
+    thead.appendChild(head);
+    table.appendChild(thead);
+    var body = document.createElement("tbody");
+    rows.forEach(function (t) {
+      var tr = document.createElement("tr");
+      tr.appendChild(make("td", t.reference, "num"));
+      if (manager) tr.appendChild(make("td", t.raised_by || "unknown"));
+      tr.appendChild(make("td", t.subject || ""));
+      tr.appendChild(make("td", t.priority || "", "nowrap"));
+      tr.appendChild(make("td", t.status || ""));
+      tr.appendChild(make("td", t.jira || "none", "nowrap"));
+      tr.appendChild(make("td", t.created || "", "nowrap"));
+      body.appendChild(tr);
+    });
+    table.appendChild(body);
+    box.appendChild(table);
+  }
+
+  function loadInfo() {
+    if (!login) return;
+    window.fetch(DATA_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify({ access_token: login.token })
+    }).then(function (response) {
+      if (response.status === 401) { showSignIn("Your sign-in was not accepted. Please sign in again."); return null; }
+      if (!response.ok) throw new Error("status " + response.status);
+      return response.json();
+    }).then(function (info) {
+      if (!info || !login) return;
+      renderProfile(info);
+      renderTickets(info);
+    }).catch(function () {
+      var box = el("profile");
+      box.textContent = "";
+      box.appendChild(make("span", "Could not load your profile. The chat still works.", "hint"));
+    });
   }
 
   // Builds text safely. Only **bold** is turned into formatting.
@@ -221,6 +379,7 @@
       if (!data) return;
       waiting.remove();
       addMessage("bot", data.output || "Sorry, I could not answer that. Please try again.");
+      loadInfo();
     }).catch(function (error) {
       waiting.remove();
       var reason = error && error.name === "AbortError" ? "The helpdesk took too long to answer." : (error && error.message) || "Could not reach the helpdesk.";
@@ -237,8 +396,14 @@
   });
   el("signout").addEventListener("click", function () {
     el("log").textContent = "";
+    el("profile").textContent = "";
+    el("tickets-box").textContent = "";
+    showTab("chat");
     showSignIn("");
   });
+  el("tab-chat").addEventListener("click", function () { showTab("chat"); });
+  el("tab-tickets").addEventListener("click", function () { showTab("tickets"); });
+  el("refresh").addEventListener("click", loadInfo);
   el("form").addEventListener("submit", function (event) {
     event.preventDefault();
     send(el("text").value);
