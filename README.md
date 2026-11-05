@@ -41,6 +41,49 @@ The Supabase direct host is IPv6-only and neither Railway nor a home network cou
 
 ## Diagram
 
+### System overview
+
+Who the user is, where that is decided, and what each agent is allowed to read.
+
+```mermaid
+flowchart TB
+    subgraph br["Browser, served by GitHub Pages"]
+        PG["Chat page"]
+    end
+    subgraph sb["Supabase Auth"]
+        GO["Google sign-in"]
+    end
+    PG -->|"redirect"| GO
+    GO -->|"access token in the URL fragment,<br/>stripped from the URL on read"| PG
+    PG -->|"token and message"| FD
+
+    subgraph n8n["n8n, self-hosted on Railway"]
+        FD["Front door:<br/>verify the token at /auth/v1/user"]
+        FD -->|"invalid"| X401["401 not_signed_in,<br/>no model is called"]
+        FD -->|"valid"| ROLE["Look up country and role<br/>by the verified email"]
+        ROLE --> GRD["Guard: mask PII,<br/>check for injection"]
+        GRD --> RT{"IT or HR?"}
+        RT -->|"IT"| ITA["IT Helpdesk Agent"]
+        RT -->|"HR"| HRA["HR Helpdesk Agent"]
+        ITA -. tool .-> SOP["Suggest Fix from SOPs"]
+        HRA -. tool .-> POL["HR Policy Search<br/>with a metadata filter"]
+        ITA -. tool .-> TRI["Ticket triage flow"]
+        TRI --> PH["P1 phone call"]
+    end
+
+    SOP --> PCS[("Pinecone<br/>sops")]
+    POL --> PCH[("Pinecone<br/>hr-policies")]
+    ITA --> DB[("Supabase Postgres:<br/>tickets, sessions, memory,<br/>HR records, eval runs")]
+    HRA --> DB
+    TRI --> DB
+    PH --> EL["ElevenLabs agent<br/>over a SIP trunk"]
+    EL -->|"what the engineer said"| DB
+```
+
+The country and role that drive the HR metadata filter come from the HR record matched to the email Google verified. Nothing the browser sends can change them.
+
+### Ticket triage flow
+
 ```mermaid
 flowchart LR
     A[Webhook: Receive Ticket] --> B[Normalize Ticket]
@@ -73,20 +116,46 @@ flowchart LR
     X[Any failure] -.-> Y[Error workflow: Slack alert]
 ```
 
-The chat agent in front of it:
+### Chat path
+
+Every message is checked for identity first and guarded second. The model is only reached after both.
 
 ```mermaid
 flowchart LR
-    U[Chat message] --> PS[Prepare Session]
-    PS --> SR[(Save Requester email in Postgres)]
-    SR --> GC[Guard Chat Message: mask PII, check injection]
-    GC --> Q{Clear injection attempt?}
-    Q -- yes --> RF[Fixed refusal, model is not called]
-    Q -- no --> AG[AI Agent: Claude Haiku]
-    AG <--> MEM[(Memory in Postgres, masked text)]
-    AG -. tool .-> T1[search_sops: RAG sub-workflow]
-    AG -. tool .-> T2[check_my_tickets: Postgres]
-    AG -. tool .-> T3[raise_ticket: triage webhook above]
+    U["Chat message plus access token"] --> V{"Token valid?"}
+    V -- no --> X["401 not_signed_in"]
+    V -- yes --> PS["Prepare Session:<br/>email, country, role"]
+    PS --> SR[("Save requester in Postgres")]
+    SR --> GC["Guard: mask PII,<br/>check injection"]
+    GC --> Q{"Clear injection attempt?"}
+    Q -- yes --> RF["Fixed refusal,<br/>model is not called"]
+    Q -- no --> RT{"IT or HR?"}
+    RT -- IT --> AG["IT Agent: Claude Haiku"]
+    RT -- HR --> HG["HR Agent: Claude Haiku"]
+    AG <--> MEM[("Memory in Postgres,<br/>masked text")]
+    HG <--> MEM
+    AG -. tool .-> T1["search_sops"]
+    AG -. tool .-> T2["check_my_tickets"]
+    AG -. tool .-> T3["raise_ticket"]
+    HG -. tool .-> T4["search_hr_policies,<br/>filtered to country and role"]
+    HG -. tool .-> T5["my_hr_record"]
+```
+
+### P1 phone call
+
+The call confirms who answered before it says anything about the incident, and the engineer's reply is written back into Postgres while the call is still open.
+
+```mermaid
+flowchart LR
+    T["Triage marks a ticket P1"] --> D["ElevenLabs outbound call<br/>over the SIP trunk"]
+    D --> ID{"Am I speaking<br/>with the on-call engineer?"}
+    ID -- no --> NO["Only: sorry to disturb you,<br/>I will try again later.<br/>Nothing about the incident"]
+    NO --> LOGN[("oncall_ack:<br/>identity_verified false")]
+    ID -- yes --> AL["Read alert_text<br/>word for word"]
+    AL --> RESP["Take the engineer's reply"]
+    RESP --> ACK["record_ack webhook,<br/>header auth"]
+    ACK --> LOG[("oncall_ack:<br/>reply, acknowledged, call id")]
+    LOG --> END["End the call"]
 ```
 
 ## Workflows
