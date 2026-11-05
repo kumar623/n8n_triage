@@ -46,37 +46,22 @@ The Supabase direct host is IPv6-only and neither Railway nor a home network cou
 Who the user is, where that is decided, and what each agent is allowed to read.
 
 ```mermaid
-flowchart TB
-    subgraph br["Browser, served by GitHub Pages"]
-        PG["Chat page"]
-    end
-    subgraph sb["Supabase Auth"]
-        GO["Google sign-in"]
-    end
-    PG -->|"redirect"| GO
-    GO -->|"access token in the URL fragment,<br/>stripped from the URL on read"| PG
-    PG -->|"token and message"| FD
-
-    subgraph n8n["n8n, self-hosted on Railway"]
-        FD["Front door:<br/>verify the token at /auth/v1/user"]
-        FD -->|"invalid"| X401["401 not_signed_in,<br/>no model is called"]
-        FD -->|"valid"| ROLE["Look up country and role<br/>by the verified email"]
-        ROLE --> GRD["Guard: mask PII,<br/>check for injection"]
-        GRD --> RT{"IT or HR?"}
-        RT -->|"IT"| ITA["IT Helpdesk Agent"]
-        RT -->|"HR"| HRA["HR Helpdesk Agent"]
-        ITA -. tool .-> SOP["Suggest Fix from SOPs"]
-        HRA -. tool .-> POL["HR Policy Search<br/>with a metadata filter"]
-        ITA -. tool .-> TRI["Ticket triage flow"]
-        TRI --> PH["P1 phone call"]
-    end
-
-    SOP --> PCS[("Pinecone<br/>sops")]
-    POL --> PCH[("Pinecone<br/>hr-policies")]
-    ITA --> DB[("Supabase Postgres:<br/>tickets, sessions, memory,<br/>HR records, eval runs")]
+flowchart LR
+    PG["Chat page<br/>GitHub Pages"] -->|"sign in"| GO["Google via<br/>Supabase Auth"]
+    GO -->|"access token"| PG
+    PG -->|"token + message"| FD["Front door:<br/>verify the token"]
+    FD -->|"invalid"| X401["401, no model<br/>is called"]
+    FD -->|"valid"| ROLE["Country and role<br/>from the HR record"]
+    ROLE --> GRD["Guard: mask PII,<br/>check injection"]
+    GRD --> RT{"IT or HR?"}
+    RT -->|IT| ITA["IT Agent"]
+    RT -->|HR| HRA["HR Agent"]
+    ITA -. tool .-> SOP["SOP search"] --> PCS[("Pinecone<br/>sops")]
+    HRA -. tool .-> POL["Policy search,<br/>filtered"] --> PCH[("Pinecone<br/>hr-policies")]
+    ITA -. tool .-> TRI["Triage flow"] --> PH["P1 call"] --> EL["ElevenLabs<br/>over SIP"]
+    ITA --> DB[("Supabase<br/>Postgres")]
     HRA --> DB
     TRI --> DB
-    PH --> EL["ElevenLabs agent<br/>over a SIP trunk"]
     EL -->|"what the engineer said"| DB
 ```
 
