@@ -8,7 +8,21 @@ The same pattern was then reused for a second department: an **HR helpdesk agent
 
 Both agents sit behind **one chat**. A small router decides whether each message is IT or HR and hands it to the right specialist agent.
 
-Status: working prototype, built as a personal project. It runs live on an n8n cloud trial. It is not a client production system.
+Status: working prototype, built as a personal project. It is not a client production system.
+
+## Where it runs
+
+The n8n cloud trial it was built on became unreachable, so the whole thing was moved to self-hosted n8n with its workflow IDs preserved, which kept all 14 sub-workflow links intact. Importing through the UI or the public API assigns new IDs and breaks those links; `n8n import:workflow --separate --input=<dir>` keeps them, so the import runs from a directory baked into the image at boot.
+
+| Piece | Runs on |
+|---|---|
+| n8n + Postgres (n8n's own state) | Railway |
+| Application data: tickets, sessions, chat memory, HR records, eval runs | Supabase Postgres, via the session pooler on port 5432 |
+| SOP and HR policy vectors | Pinecone, 512 dimensions, cosine, namespaces `sops` and `hr-policies` |
+| Chat page | GitHub Pages |
+| P1 phone call | ElevenLabs Agents over a SIP trunk |
+
+The Supabase direct host is IPv6-only and neither Railway nor a home network could reach it. The session pooler (not the transaction pooler) is the fix, because several queries are multi-statement `WITH s AS (INSERT ...)` blocks that a transaction pooler will not hold a session open for.
 
 ## What it does
 
@@ -19,7 +33,7 @@ Status: working prototype, built as a personal project. It runs live on an n8n c
 5. Claude Haiku classifies it: category, priority, affected system, summary, confidence.
 6. Code re-checks the model output. P1, security, low confidence, bad output, or suspected prompt injection forces a human review.
 7. RAG: the ticket is matched against SOPs in Pinecone, and Claude writes a short fix using only the matching SOP.
-8. P1 tickets send an email alert through Gmail, and Vapi places a phone call to the on-call number and reads out the alert.
+8. P1 tickets send an email alert through Gmail, and an ElevenLabs agent phones the on-call engineer. It confirms who answered before it says anything about the incident, reads the alert, takes the engineer's reply, and writes that reply back into Postgres through a webhook.
 9. Tickets that need a human wait in Slack for Approve or Decline. If nobody clicks within 1 hour, a second, escalated request is posted with a channel mention. If that also gets no click within 1 hour, the ticket is logged as timed out.
 10. Auto-triaged and approved tickets create a Jira issue with the priority, triage details and suggested fix. Declined and timed-out tickets create nothing.
 11. The outcome, with the Jira link, is posted to Slack and saved in Postgres.
@@ -43,7 +57,7 @@ flowchart LR
     H1 --> R[Suggest Fix: sub-workflow, Pinecone + Claude]
     R --> P{P1?}
     P -- yes --> P1[Gmail: P1 alert]
-    P1 --> P2[Vapi: phone call to on-call]
+    P1 --> P2[ElevenLabs: phone call to on-call]
     P2 --> I{Needs human?}
     P -- no --> I
     I -- yes --> J[Slack: Approve or Decline, 1 hour]
@@ -294,7 +308,8 @@ Shared and separate state:
 | Run crashes after claiming a ticket | A row stuck in `processing` for 15 minutes can be claimed again |
 | Model or database call fails | Retries: 2 or 3 tries with a wait between them |
 | Slack is down | Outcome message is set to continue on error, so the ticket still completes |
-| Vapi call fails | No retry, on purpose, so the phone cannot ring twice. The ticket continues with email and Slack |
+| Phone call fails | No retry, on purpose, so the phone cannot ring twice. The ticket continues with email and Slack |
+| Wrong person answers the phone | The agent says only that it will try again later. It does not read the incident, and it logs the attempt with `identity_verified = false` |
 | Jira is down | 3 tries, then continue. Slack says the issue was not created and `jira_key` stays empty |
 | Nobody answers the approval | After 1 hour a second, escalated request is posted. After 1 more hour the outcome is saved as `timed_out` with `escalated = true`, and no Jira issue is created |
 | Unknown callers | The webhook requires a secret header (n8n Header Auth credential). Calls without it get 403 before the workflow runs |
@@ -364,6 +379,31 @@ Two single-message checks after the prompt rewrite: "raise ticket as P1" for a p
 
 Run the evals after every prompt, SOP, threshold or model change.
 
+## Bugs that only measuring would have found
+
+**The ticket list silently dropped a row.** Asked for ticket status, the agent listed five tickets. The database had six. The query had no `LIMIT`.
+
+The first guess was that the model had summarised and dropped one. That was wrong. Reading the tool output from the execution showed five rows reaching the model while `count(*) OVER ()` in the same query reported six, so the model had been faithful to what it was given and something between Postgres and the agent was capping the items.
+
+Rather than find the cap, the query was changed to return **one row** holding a count and a `json_agg` array of every ticket. One row cannot be truncated item-wise. The sixth ticket came back.
+
+Two things worth keeping from this. The first fix made the reply say "You have 6 tickets" and then list five, which is wrong but at least visibly wrong; silent omission is worse than a visible contradiction. And a contributing cause was in the prompt: a style rule saying "keep replies under 8 lines" was pressuring the model to trim a six-item list. The rule now exempts ticket lists.
+
+**A tool pointing at an unpublished workflow fails as a tool error, not a workflow error.** After the move, `search_sops` returned `Workflow is not active and cannot be executed` twice. The agent answered from its own knowledge instead, and the run was still marked a success. A sub-workflow used as a tool has to be published, and a green execution is not evidence the tools inside it worked.
+
+## Cost
+
+Measured, not estimated.
+
+| Interaction | Cost |
+|---|---|
+| One P1 phone call, 11 seconds, answered | 95 ElevenLabs credits, about $0.019 |
+| of which voice | 77 credits |
+| of which LLM | 18 credits |
+| Classifier eval, 20 tickets | 2,258 tokens on Claude Haiku for a single agent turn |
+
+Voice is about four times the LLM cost, so on the phone leg the model choice barely moves the bill.
+
 ## Dependencies
 
 | Service | Used for | Credential in n8n |
@@ -376,7 +416,7 @@ Run the evals after every prompt, SOP, threshold or model change.
 | Slack | Alerts and approvals | Slack OAuth2 |
 | Jira Software Cloud | Issue creation in project IT Support | Email plus API token |
 | Gmail | P1 alert email | Gmail OAuth2 |
-| Vapi (with a Twilio number) | P1 phone call. The assistant reads the alert passed in `assistantOverrides` | Bearer Auth (Vapi private key) |
+| ElevenLabs Agents (with a SIP trunk number) | P1 phone call. The alert is passed as the `alert_text` dynamic variable and spoken as the agent's first line after the identity check | Header Auth (`xi-api-key`) |
 | Webhook callers | Secret header on the intake webhook | Header Auth |
 
 ## Set up in a new n8n
@@ -386,7 +426,7 @@ Run the evals after every prompt, SOP, threshold or model change.
 3. In n8n, add credentials for Postgres, Slack, Jira, Gmail, Pinecone, Anthropic and OpenAI, plus a Header Auth credential for the webhook secret.
 4. Import the files in `workflows/` in this order: 02, 03, 04, 10, then 01, then the rest.
 5. In 01, 07, 08 and 11, re-point the "Execute Sub-workflow" nodes and the `search_sops` tool to the imported 02, 03 and 10 (workflow ids change on import). In 01 and 11, set the error workflow to 04.
-6. Pick your Slack channel in the Slack nodes, your Jira project and issue type in the Jira node, the alert address in the Gmail node, and your Vapi assistant id, phone number id and on-call number in the Vapi node. Set your own n8n host in the HTTP nodes of 05, 09, 11 (`raise_ticket`) and 12.
+6. Pick your Slack channel in the Slack nodes, your Jira project and issue type in the Jira node, the alert address in the Gmail node, and your ElevenLabs agent id, phone number id and on-call number in the ElevenLabs node. Set your own n8n host in the HTTP nodes of 05, 09, 11 (`raise_ticket`) and 12.
 7. Run 06 once to load the SOPs. Run 07 and 08 and check the scores.
 8. Publish 02, 03, 04, 10, then 01, then 11. Open the Chat Trigger in 11 to copy the chat URL, put it in 12, and run 12.
 9. HR: import 13 to 17. Run 13 once to load the policies. Publish 14. In 15 and 16, re-point the sub-workflow nodes to the imported 14 (and 10 in 16). Run 15 and check both scores. Publish 16, copy its chat URL into 17, and run 17.
@@ -424,22 +464,28 @@ Where to look first: n8n **Executions** list, open the failed run, click the red
    ```
 6. **Re-process a ticket:** delete its row from `ticket_log` and send it again.
 
+## Limits closed since the first version
+
+These were in the list below and are no longer true. They are kept here because what changed is more interesting than the end state.
+
+- **The chat had no login and trusted the email the user typed**, so anyone could read anyone's tickets. The page now signs in with Google through Supabase Auth, and the workflow verifies the token against `/auth/v1/user` on every message before any model runs. Country, role and leave balance come from the HR record matched to the verified email, not from anything the browser sends. The same fix closed the HR variant, where typing another person's email switched the session to their policies.
+- **The raw ticket text and the user's access token sat in the n8n execution log.** The two public workflows now run with `saveDataSuccessExecution: none`, so a successful message stores nothing. Failed runs still save, which is a deliberate trade for being able to debug them.
+- **The P1 call only knew the phone provider had accepted it.** It now gets a call result, a transcript, and the engineer's own words written to `oncall_ack`.
+
 ## Known limits
 
 - The webhook requires a secret header, but the demo form page and the chat page are public. Unpublish them when they are not in use.
-- The chat has no login. It trusts the email the user types, so anyone could ask for another person's ticket list. In real use the email must come from single sign-on, not from the chat text.
 - The router sees one message and the last topic, not the whole conversation. A follow-up that is long and does not name its subject could be sent to the wrong specialist. The 7-turn test is one scripted conversation, not a routing eval.
 - The specialists keep separate memory, so the HR agent does not know what was said to the IT agent in the same chat.
 - The IT agent sometimes repeats a tag such as `[EMAIL_1]` back to the user. It shows the masking is real, but it reads oddly.
-- In the HR chat, typing another person's email switches the session to that person's country, role and leave balance. This is the same no-login limit. The metadata filter itself is sound; what feeds it must be a verified identity.
 - The HR knowledge base is 14 short made-up policies for two countries. Each policy is one chunk. Long real policies would need chunking, and every chunk would need the same metadata.
 - The HR eval is 14 questions written by the same person who wrote the policies. It shows the effect of the filter, not production accuracy.
-- The filter relies on passing a Pinecone operator object (`$in`) through the n8n Metadata Filter field as an expression. It works on n8n 2.43 and is covered by the eval, but it is not a documented n8n feature. A fallback is one yes/no metadata flag per country and per audience, which needs only equality filters.
+- The filter relies on passing a Pinecone operator object (`$in`) through the n8n Metadata Filter field as an expression. It works on n8n 2.46 and is covered by the eval, but it is not a documented n8n feature. A fallback is one yes/no metadata flag per country and per audience, which needs only equality filters.
 - The guard uses regular expressions. It does not catch names, postal addresses or free-text secrets, and a determined attacker can word an injection to slip past it. That is why the prompt rule, the output check and the human approval are still there.
 - Masking is one-way. IT sees `[PHONE_1]` in Jira and must ask the requester for the number.
-- The raw ticket text is still inside the n8n execution log of the webhook and guard steps. In real use, turn on execution data redaction or do not save execution data for these workflows.
 - The P1 email and phone call go to one fixed address and one fixed number. A real setup would use an on-call rota.
-- The workflow knows Vapi accepted the call, not whether anyone picked up. Vapi's end-of-call webhook would be needed for that.
+- The phone agent asks for one name and believes the answer. It is a check against a wrong number, not authentication.
+- The call records what the engineer said, but nobody reads `oncall_ack` yet. A rota and a re-page on no acknowledgement would be the next step.
 - "Ignore SSL Issues" is on for the Postgres credential. For real use, add the Supabase CA certificate.
 - Jira issues are created but not updated later. There is no sync back from Jira when an issue is resolved.
 - A crash between creating the Jira issue and saving the outcome could create a second issue when the ticket is retried after 15 minutes.
